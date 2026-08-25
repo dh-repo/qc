@@ -68,7 +68,24 @@ Slash-style triggers once a skill folder is installed: `/qc-core`, `/qc-hardenin
 
 **What.** Drive residual concrete failure scenarios (call sequences, dual/public paths, live adapters) to zero or explicit deferral, without changing functional behavior. Terminal state: clean Carmack across modules plus a green in-repo Chaos suite.
 
-**How.** Fourteen ordered passes. Mechanical 1–11 remove tool-visible noise. Carmack and Chaos (12–13) prove absences tools miss. Maintainability (14) turns the evidence into a release judgment. Deep findings carry trigger, violated invariant, and observable. Dual-vote to fix; otherwise defer. Presence of any P0, even after the fix, is `NOT_READY`.
+**How.** Fourteen ordered passes. Mechanical 1–11 remove tool-visible noise. Carmack and Chaos (12–13) prove absences tools miss. Maintainability (14) turns the evidence into a release judgment. Do not skip or reorder. Pass 8 runs twice (8a before the deep passes, 8b after 12–13). Deep findings carry trigger, violated invariant, and observable. Dual-vote to fix; otherwise defer. Presence of any P0, even after the fix, is `NOT_READY`.
+
+| Pass | Name | Job |
+|---|---|---|
+| 1 | Correctness | Sequences, dual-path API parity, field population, classification completeness, I/O coercion on every ingest path |
+| 2 | Security | Secrets, injection, dependency CVEs |
+| 3 | Error handling and resilience | External boundaries, resource lifecycle, schema/validation integrity |
+| 4 | Type safety and contracts | Type checker, public contracts, linter |
+| 5 | Concurrency and async correctness | Shared state, missing `await`, races (skip if no concurrency) |
+| 6 | Performance and scale | Algorithmic, I/O, and memory issues with concrete evidence — no micro-opts |
+| 7 | Logging and observability | Error logs, secrets/PII in logs, `print()` hygiene |
+| 8 | Test coverage gaps | 8a: functional coverage before deep passes; 8b: regression tests for Carmack/Chaos fixes |
+| 9 | Documentation accuracy | Docstrings, README, comments match code (docs follow code) |
+| 10 | Backward compatibility | Public signatures, behavioral contracts, validation permissiveness (skip if no public API) |
+| 11 | Environment, config, and build integrity | Env vars, config, lockfile/deps, CI alignment, containers |
+| 12 | Carmack review | First-principles read of every module; five adversarial questions; harvests invariants |
+| 13 | Chaos monkey | In-repo adversarial tests (`tests/test_chaos.py`); no-crash / right exception / graceful degradation |
+| 14 | Maintainability and consistency | Release judgment plus Consistency / Maintainability / Overall grades |
 
 **Why.** Feature-complete code with a green suite still fails in production on combinations, races, and adapter edges. Linters do not prove those absences.
 
@@ -78,7 +95,35 @@ Slash-style triggers once a skill folder is installed: `/qc-core`, `/qc-hardenin
 
 **What.** Guarantee compositional consistency: every public contract has complete, aligned implementations; domain concepts use single canonical forms; architectural boundaries are uniform; previously discovered invariants remain enforced. Produces maps and an invariant registry, not one-shot opinions.
 
-**How.** Four sub-audits in order: Structural, Conformance, Semantic, Architectural. Optional `--scope=module` runs MS-1–MS-6. The hardening ledger is prior-state; deferred items are linked, not re-minted. Dual-vote on LLM-assisted lenses. Persist `canonical_forms[]`, `layer_model`, `invariants[]`, and `clusters[]` on the profile.
+**How.** Four sub-audits in order: Structural (S1–S5), Conformance (C1), Semantic (M1–M5), Architectural (A1–A5). Optional `--scope=module` runs MS-1–MS-6 (when 2+ backends exist, MS-4 runs immediately after MS-1). The hardening ledger is prior-state; deferred items are linked, not re-minted. Dual-vote on LLM-assisted lenses. Persist `canonical_forms[]`, `layer_model`, `invariants[]`, and `clusters[]` on the profile.
+
+| Sub-audit | Check | Job |
+|---|---|---|
+| Structural | S1 Stub detection | `TODO`/`NotImplementedError`/`pass`/`...` in non-abstract production paths |
+| Structural | S2 Dead code and dangling references | Orphan exports, unused publics, broken/shadowed imports |
+| Structural | S3 Duplication detection | Exact, parametric, and semantic clones |
+| Structural | S4 Type coverage | Strict type checker; `Any` and unexplained `# type: ignore` |
+| Structural | S5 Unused dependencies | Manifest packages with zero matching imports |
+| Conformance | C1 Protocol/implementation matrix | Every interface method present, signed, and observably equivalent across backends |
+| Semantic | M1 Naming consistency | One canonical name per domain concept |
+| Semantic | M2 Error handling taxonomy | Equivalent conditions raise equivalent exception types |
+| Semantic | M3 Serialization round-trip | `deserialize(serialize(x)) == x` and matching keys |
+| Semantic | M4 Behavioral contract consistency | Same logical role, same behavior across implementations |
+| Semantic | M5 Magic values and implicit constants | Repeated domain literals not named or centralized |
+| Architectural | A1 Dependency direction | Import graph vs permitted layer directions |
+| Architectural | A2 Layer boundary enforcement | No internals bypass; domain stays free of infrastructure |
+| Architectural | A3 Module responsibility | Mixed domains in one module; split is deferred, not executed |
+| Architectural | A4 Documented invariants as tests | Comments/ADRs harvested; untested testable invariants are findings |
+| Architectural | A5 Cross-cutting concern consistency | Logging, auth, retry, transactions, flags implemented the same way |
+
+| Module scope | Job |
+|---|---|
+| MS-1 Protocol conformance parity | Same Protocol method, same assertion, every backend |
+| MS-2 Responsibility density | Oversized modules accumulating unrelated domains |
+| MS-3 Coordination surface | Locks, gates, events, and state-machine comprehensibility |
+| MS-4 Backend parity | Feature set and SQL-dialect gaps across alternative stores |
+| MS-5 Cross-session consistency | New code reintroducing patterns prior hardening already flagged |
+| MS-6 Test architecture | Fixture duplication, parameterization gaps, oversized test files |
 
 **Why.** Several clean feature sessions still leave protocol/backend drift, aliasing, stubs, and layer violations that per-function checks miss. Hardening owns runtime proof of sequences. This skill owns static contracts and canonical forms.
 
