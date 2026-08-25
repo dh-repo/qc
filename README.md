@@ -8,30 +8,35 @@ This is not a hosted product. The agent follows the skill; a small Python harnes
 
 ## Install
 
-Fastest path, any agent:
-
 ```bash
 npx skills add dh-repo/qc
 ```
 
-That copies each `skills/<name>/` folder into the agent(s) you have installed (Claude Code, Codex, Grok, Cursor, …). Use `-g` for a user-wide install.
+That command does not talk to Claude, Codex, or Grok. It clones this repo, finds each `skills/<name>/SKILL.md` tree, detects which agents you have installed, and copies (or symlinks) those folders into the directories those agents already watch. After that, the next session loads `name` + `description` from every `SKILL.md` it finds. A matching prompt, or a slash command like `/qc-hardening`, loads the rest.
+
+Default is **this project** (next to the directory you ran it from). `-g` is **user-wide**, every repo on this machine.
 
 ```bash
 npx skills add dh-repo/qc -g
 npx skills add dh-repo/qc --skill qc-hardening
+npx skills add dh-repo/qc --skill qc-hardening -a claude-code -g -y
 npx skills add dh-repo/qc --list
 ```
 
-### By agent
+### Where the files land
 
-| Agent | Global install location | Project install location |
-|---|---|---|
-| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
-| Codex | `~/.codex/skills/` | `.agents/skills/` |
-| Grok Build | `~/.grok/skills/` | `.grok/skills/` |
-| Cursor / Copilot / Gemini CLI | `~/.cursor/skills/` or `~/.agents/skills/` | `.agents/skills/` |
+| Agent | Global (`-g`) | Project (default) | How it picks the skill up |
+|---|---|---|---|
+| Claude Code | `~/.claude/skills/<name>/` | `.claude/skills/<name>/` | Session start reads frontmatter; slash `/qc-hardening`; auto-invoke from `description` |
+| Codex | `~/.codex/skills/<name>/` | `.agents/skills/<name>/` | Same `SKILL.md` format; description decides when to apply |
+| Grok Build | `~/.grok/skills/<name>/` | `.grok/skills/<name>/` | Slash `/qc-hardening`; auto-invoke from `description`; reloads when files change |
+| Cursor / Copilot / Gemini CLI | `~/.cursor/skills/` or `~/.agents/skills/` | `.agents/skills/` | Same Agent Skills discovery |
 
-Manual copy (equivalent to a per-skill install):
+Each installed folder is the full skill: `SKILL.md`, `references/`, `scripts/verify_ledger.py`. That is the whole install. No API key, no marketplace account, no runtime registration.
+
+### Manual copy
+
+Equivalent to a per-skill install:
 
 ```bash
 git clone https://github.com/dh-repo/qc.git
@@ -43,6 +48,8 @@ cp -R qc/skills/qc-hardening ~/.grok/skills/
 Claude Code can also load the repo as a plugin (`.claude-plugin/plugin.json` at the root; skills auto-discovered under `skills/`).
 
 Each skill is self-contained. `npx skills add dh-repo/qc --skill qc-hardening` is enough to run hardening; you do not need the rest of the suite unless you want `qc-all` to roll the four skills up.
+
+The install does **not** run a QC pass. It only plants the instructions. You still say “harden” or `/qc-hardening` in that agent, against whatever repo is open.
 
 ## Skills
 
