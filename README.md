@@ -1,5 +1,7 @@
 # qc
 
+Source: [github.com/dh-repo/qc](https://github.com/dh-repo/qc)
+
 Quality-control skills for coding agents. Same `SKILL.md` trees run in Claude Code, Codex, Grok Build, Cursor, and any other client that speaks the [Agent Skills](https://agentskills.io) format.
 
 This is not a hosted product. The agent follows the skill; a small Python harness checks the findings ledger so a standalone run and a full-suite rollup never disagree on the verdict.
@@ -65,6 +67,18 @@ Slash-style triggers once installed: `/qc-hardening`, `/qc-coherence`, `/qc-docs
 
 Verdicts are one enum: `READY`, `READY_WITH_DEBT`, `NOT_READY`. Any P0 (fixed or not) or any open P1 blocks release. The copy of `scripts/verify_ledger.py` inside each skill recomputes that verdict; if it disagrees with the ledger, fix the ledger.
 
+## Docs
+
+Reconstruction specs — enough to rebuild each skill in another agent without the original tree:
+
+| PDF | What it covers |
+|---|---|
+| [`docs/qc-hardening.pdf`](docs/qc-hardening.pdf) | 14-pass production audit, Carmack/Chaos, ledger and verdict math |
+| [`docs/qc-coherence.pdf`](docs/qc-coherence.pdf) | Cross-cutting drift, S/C/M/A sub-audits, module-scope checks |
+| [`docs/qc-docs.pdf`](docs/qc-docs.pdf) | Landing page + operational docs, truth hierarchy, quality gates |
+
+`qc-packaging` and `qc-all` are specified in their `SKILL.md` files; they do not have a separate reconstruction PDF yet.
+
 ## Layout
 
 ```
@@ -74,11 +88,12 @@ skills/
   qc-docs/
   qc-packaging/
   qc-all/           router, schema, rollup, history
-docs/specs/         reconstruction PDFs
+docs/
+  qc-hardening.pdf
+  qc-coherence.pdf
+  qc-docs.pdf
 .claude-plugin/     Claude plugin manifest
 ```
-
-Reconstruction specs (how to rebuild a skill from the contract): [`docs/specs/`](docs/specs/).
 
 ## License
 
