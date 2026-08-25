@@ -366,6 +366,91 @@ def test_vendored_landing_checks_skip() -> None:
         vs._repo_root = orig
 
 
+def test_landing_requires_products_and_install() -> None:
+    print("landing product and install gates")
+    import verify_skills as vs
+
+    orig = vs._repo_root
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "docs").mkdir()
+        (root / "docs" / "qc-core.pdf").write_bytes(b"%PDF-1.4\n")
+        vs._repo_root = lambda: root
+        try:
+            (root / "README.md").write_text(
+                "qc-core qc-hardening qc-coherence qc-docs qc-packaging\n"
+                ".qc-profile.json\n.qc-findings/\n"
+                "qc-packaging qc-hardening qc-coherence qc-docs\n"
+                "npx skills add dh-repo/qc\n",
+                encoding="utf-8",
+            )
+            ok, msg = vs.check_readme_docs_contract(None)
+            check("omitting qc-all fails", (not ok) and "qc-all" in msg, msg)
+            (root / "README.md").write_text(
+                "qc-core qc-hardening qc-coherence qc-docs qc-packaging qc-all\n"
+                ".qc-profile.json\n.qc-findings/\n"
+                "qc-packaging qc-hardening qc-coherence qc-docs\n",
+                encoding="utf-8",
+            )
+            ok, msg = vs.check_readme_docs_contract(None)
+            check("omitting npx skills add fails", (not ok) and "npx skills add" in msg, msg)
+            (root / "README.md").write_text(
+                "qc-core qc-hardening qc-coherence qc-docs qc-packaging qc-all\n"
+                ".qc-profile.json\n.qc-findings/\n"
+                "qc-packaging qc-hardening qc-coherence qc-docs\n"
+                "npx skills add dh-repo/qc\n"
+                "| Antigravity | `~/.agents/skills/` | `.agents/skills/` |\n",
+                encoding="utf-8",
+            )
+            ok, msg = vs.check_readme_docs_contract(None)
+            check(
+                "omitting Antigravity load path fails",
+                (not ok) and "~/.gemini/config/skills" in msg,
+                msg,
+            )
+            (root / "README.md").write_text(
+                "qc-core qc-hardening qc-coherence qc-docs qc-packaging qc-all\n"
+                ".qc-profile.json\n.qc-findings/\n"
+                "qc-packaging qc-hardening qc-coherence qc-docs\n"
+                "npx skills add dh-repo/qc\n"
+                "~/.gemini/config/skills\n"
+                "| Antigravity | `~/.agents/skills/` | `.agents/skills/` |\n",
+                encoding="utf-8",
+            )
+            ok, msg = vs.check_readme_docs_contract(None)
+            check(
+                "Antigravity global ~/.agents/skills/ fails",
+                (not ok) and "~/.agents/skills" in msg,
+                msg,
+            )
+            (root / "README.md").write_text(
+                "qc-core qc-hardening qc-coherence qc-docs qc-packaging qc-all\n"
+                ".qc-profile.json\n.qc-findings/\n"
+                "qc-packaging qc-hardening qc-coherence qc-docs\n"
+                "npx skills add dh-repo/qc\n"
+                "## What it does not do\n",
+                encoding="utf-8",
+            )
+            ok, msg = vs.check_readme_docs_contract(None)
+            check("omitting mermaid diagram fails", (not ok) and "mermaid" in msg, msg)
+            (root / "README.md").write_text(
+                "qc-core qc-hardening qc-coherence qc-docs qc-packaging qc-all\n"
+                ".qc-profile.json\n.qc-findings/\n"
+                "qc-packaging qc-hardening qc-coherence qc-docs\n"
+                "npx skills add dh-repo/qc\n"
+                "```mermaid\nflowchart TB\n  a[a]\n```\n",
+                encoding="utf-8",
+            )
+            ok, msg = vs.check_readme_docs_contract(None)
+            check(
+                "omitting What it does not do fails",
+                (not ok) and "What it does not do" in msg,
+                msg,
+            )
+        finally:
+            vs._repo_root = orig
+
+
 def test_docs_contract() -> None:
     print("docs contract")
     from verify_skills import (  # noqa: E402
@@ -404,6 +489,7 @@ def main() -> int:
     test_suite_rollup_unreadable()
     test_chaos_unreadable_json_clis()
     test_vendored_landing_checks_skip()
+    test_landing_requires_products_and_install()
     test_docs_contract()
     print(f"\n{passed} PASS, {failed} FAIL")
     print("verdict:", "PASS" if failed == 0 else "FAIL")

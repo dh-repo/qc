@@ -309,6 +309,14 @@ _README_FORBIDDEN = (
     (re.compile(r"\.structural-integrity\.md"), "presents .structural-integrity.md as current"),
 )
 _LANDING_PDFS = ("qc-core", "qc-hardening", "qc-coherence", "qc-docs")
+_LANDING_PRODUCTS = (
+    "qc-core",
+    "qc-hardening",
+    "qc-coherence",
+    "qc-docs",
+    "qc-packaging",
+    "qc-all",
+)
 _PDF_FORBIDDEN = (
     ".hardening-profile.md",
     ".structural-integrity.md",
@@ -346,8 +354,16 @@ def check_readme_docs_contract(_f: str | None) -> tuple[bool, str]:
         return True, "landing checks skipped (not the qc pack checkout)"
     readme_path = _repo_root() / "README.md"
     text = readme_path.read_text(encoding="utf-8")
-    if "qc-core" not in text:
-        return False, "README omits qc-core"
+    missing_products = [name for name in _LANDING_PRODUCTS if name not in text]
+    if missing_products:
+        return False, f"README omits products: {missing_products}"
+    if "npx skills add" not in text:
+        return False, "README omits install path npx skills add"
+    if "Antigravity" in text:
+        if "~/.gemini/config/skills" not in text:
+            return False, "README omits Antigravity load path ~/.gemini/config/skills"
+        if re.search(r"Antigravity\s*\|\s*`~/\.agents/skills/`", text):
+            return False, "README lists Antigravity global as ~/.agents/skills/"
     if ".qc-profile.json" not in text:
         return False, "README omits .qc-profile.json"
     if ".qc-findings/" not in text:
@@ -357,7 +373,11 @@ def check_readme_docs_contract(_f: str | None) -> tuple[bool, str]:
     hits = [msg for pat, msg in _README_FORBIDDEN if pat.search(text)]
     if hits:
         return False, "; ".join(hits)
-    return True, "README names qc-core, profile, order; no pre-core claims"
+    if "```mermaid" not in text:
+        return False, "README omits suite mermaid diagram"
+    if "## What it does not do" not in text:
+        return False, "README omits What it does not do"
+    return True, "README names six products, install path, profile, order; diagram and does-not; no pre-core claims"
 
 
 def check_readme_links_exist(_f: str | None) -> tuple[bool, str]:

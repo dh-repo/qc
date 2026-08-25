@@ -4,9 +4,125 @@ Quality-control skills for coding agents.
 
 Source: [github.com/dh-repo/qc](https://github.com/dh-repo/qc)
 
-This is not a hosted product. The agent follows the skill. Same `SKILL.md` trees run in Claude Code, Codex, Grok Build, Cursor, and any other client that speaks the [Agent Skills](https://agentskills.io) format.
+A quality gate for agent-written code before release, merge, or production. Agents often reach feature-complete with tests green while the repo is still not releasable: runtime sequences fail, two backends diverge, packaging is missing, and the README describes a hoped system.
 
-`qc-core` is the shared contract: seven laws, ledger schema 1.1, verdict math, unified `.qc-profile.json`, Discovery+Verify, and reexam. Specializations do not reimplement those invariants. Installing a specialization without `qc-core` is incomplete.
+The coding agent follows these `SKILL.md` trees and leaves a findings ledger plus a verdict. This is not a hosted product. Same trees run in Claude Code, Codex, Grok Build, Cursor, Antigravity, and any other client that speaks the [Agent Skills](https://agentskills.io) format. `qc-core` is required; installing a specialization without it is incomplete.
+
+```mermaid
+flowchart TB
+  core["qc-core: laws, ledger, verdict, profile"]
+  all["qc-all: suite router"]
+  core --> all
+  subgraph order["Legal order"]
+    direction LR
+    packaging["qc-packaging"] --> hardening["qc-hardening"] --> coherence["qc-coherence"] --> docs["qc-docs"]
+  end
+  all --> packaging
+  core -.-> packaging
+  core -.-> hardening
+  core -.-> coherence
+  core -.-> docs
+  docs --> artifacts["target repo: .qc-findings/ and .qc-profile.json"]
+```
+
+`qc-core` is the shared contract. `qc-all` runs the four specializations in that order. Each specialization loads `qc-core` rather than copying it. A run writes artifacts into the **target** repo, not into this pack.
+
+---
+
+## The six skills
+
+| Skill | Job | Prevents |
+|---|---|---|
+| `qc-core` | Shared laws, ledger, verdict, profile, Discovery+Verify | Ports and specializations inventing different "ready" meanings |
+| `qc-packaging` | Distribution wrap for an existing Python repo | A working codebase that cannot be installed, tested in CI, or released |
+| `qc-hardening` | 14-pass audit of residual runtime failure scenarios | Feature-complete code that still breaks on sequences, dual paths, and live adapters |
+| `qc-coherence` | Compositional consistency: contracts, names, layers, harvested invariants | Several clean sessions that still leave cross-module drift |
+| `qc-docs` | Docs that match the system that exists, including handoff | A next engineer who cannot run, diagnose, recover, or hand off without tribal knowledge |
+| `qc-all` | Four specializations in legal order, one suite verdict | Four disconnected runs that drop order and prior-state |
+
+Legal suite order: **qc-packaging → qc-hardening → qc-coherence → qc-docs**. Packaging wraps what exists and must not wait on defect work. Hardening drives residual runtime failures to zero and harvests invariants. Coherence consumes that ledger so it does not rediscover local defects under new ids. Docs run last so the truth-map matches the system that survived. A standalone `/qc-docs` is still legal; docs-before-hardening on a full suite pass is not.
+
+Slash-style triggers once a skill folder is installed: `/qc-core`, `/qc-hardening`, `/qc-coherence`, `/qc-docs`, `/qc-packaging`, `/qc-all`. Agents also pick them up from the `description` frontmatter. A Claude plugin load may namespace the same skill as `/qc:qc-hardening`.
+
+### qc-core
+
+**What.** The shared contract every other skill must load first: seven laws, ledger schema 1.1, verdict math, unified `.qc-profile.json`, Discovery+Verify, and reexam. Specializations own ordered passes and what counts as a finding. This skill owns the invariants they would otherwise copy.
+
+**How.** The agent applies the laws, reads and writes `.qc-profile.json`, writes `.qc-findings/<skill>.json` atomically, and computes the verdict only via `scripts/qc.py`. Scale uses import-graph partitioning; reexam is changed files plus hot-spot neighbors. Scripts such as `verify_ledger.py` recompute artifacts after a run. They do not execute the specializations.
+
+**Why.** Without one contract, each port and each specialization drifts: different ledgers, different deferral codes, different meanings of READY.
+
+**Does not.** Audit a product by itself. Own the 14 hardening passes, coherence lenses, or docs gates. Installing `qc-core` is not a QC pass.
+
+### qc-packaging
+
+**What.** Wrap an existing Python repository for public distribution: packaging metadata, developer tooling, CI, provenance cleanup of packaging files, and a professional landing. Zero functional change.
+
+**How.** First in `qc-all`. Reads the codebase, then pyproject, editorconfig, gitattributes, gitignore, diagrams, README, CI, SECURITY/CHANGELOG, and validate install/lint/tests/build. Writes `.qc-findings/qc-packaging.json`. Open-P0 verdict policy.
+
+**Why.** Working tests plus an unfinished wrap means the repo cannot be installed, built, or presented as a public release.
+
+**Does not.** Change application code, signatures, imports, or test assertions. Add features, create tests that did not exist, or convert Poetry to PEP 621. Not for new-project scaffolding, non-Python repos, or runtime debugging.
+
+### qc-hardening
+
+**What.** Drive residual concrete failure scenarios (call sequences, dual/public paths, live adapters) to zero or explicit deferral, without changing functional behavior. Terminal state: clean Carmack across modules plus a green in-repo Chaos suite.
+
+**How.** Fourteen ordered passes. Mechanical 1–11 remove tool-visible noise. Carmack and Chaos (12–13) prove absences tools miss. Maintainability (14) turns the evidence into a release judgment. Deep findings carry trigger, violated invariant, and observable. Dual-vote to fix; otherwise defer. Presence of any P0, even after the fix, is `NOT_READY`.
+
+**Why.** Feature-complete code with a green suite still fails in production on combinations, races, and adapter edges. Linters do not prove those absences.
+
+**Does not.** Add features, redesign architecture, or change public signatures and defaults. Rewrite tests to match buggy code. Run production chaos or Game Days (blast radius is in-repo tests). Manufacture findings on a clean pass. Do not use while feature work is in progress or on a throwaway prototype.
+
+### qc-coherence
+
+**What.** Guarantee compositional consistency: every public contract has complete, aligned implementations; domain concepts use single canonical forms; architectural boundaries are uniform; previously discovered invariants remain enforced. Produces maps and an invariant registry, not one-shot opinions.
+
+**How.** Four sub-audits in order: Structural, Conformance, Semantic, Architectural. Optional `--scope=module` runs MS-1–MS-6. The hardening ledger is prior-state; deferred items are linked, not re-minted. Dual-vote on LLM-assisted lenses. Persist `canonical_forms[]`, `layer_model`, `invariants[]`, and `clusters[]` on the profile.
+
+**Why.** Several clean feature sessions still leave protocol/backend drift, aliasing, stubs, and layer violations that per-function checks miss. Hardening owns runtime proof of sequences. This skill owns static contracts and canonical forms.
+
+**Does not.** Prove live runtime paths. Redesign the architecture. Treat unexamined modules as coherent. Use during active feature work, or when a targeted hardening pass is the right tool.
+
+### qc-docs
+
+**What.** The minimal complete documentation set that lets a new engineer or operator understand, run, diagnose, recover, and hand off the system that actually exists, including residual debt from prior audits.
+
+**How.** Last in `qc-all`. Reads code plus prior ledgers and the profile. Writes `truth_map[]` before editing. Four gates: Completeness, Accuracy, Clarity, Handoff Readiness. Documents the system as found. Code wins when docs and code disagree.
+
+**Why.** Docs that describe hoped design, omit code-surfaced operator paths, or contradict CLI and config leave the next person stuck.
+
+**Does not.** Invent features, infrastructure, SLAs, or recovery procedures the code does not support. Substitute for packaging, hardening, or feature work. Leave empty template files. Turn the README into the full runbook.
+
+### qc-all
+
+**What.** The suite router: legal order, skip logic, watch manifest, history, and one suite verdict.
+
+**How.** Pre-flight the profile and the reexam set. Invoke packaging, hardening, coherence, then docs. Prior-skill ledgers are mandatory inputs. `suite_rollup.py` writes `.qc-findings/_rollup.json`. History appends one trimmed line to `.qc-history.jsonl`. Unchanged watch globs may skip a skill; skip is not a silent READY for work that should have run.
+
+**Why.** Four disconnected runs drop order and prior-state. Coherence must see deferred hardening. Docs must match the code that survived.
+
+**Does not.** Reimplement verdict math (that lives in `qc-core`). Replace a human review of P0. An empty rollup with every skill skipped is `READY` only because nothing new was gated.
+
+---
+
+## What it does not do
+
+This pack is a set of instructions a coding agent follows. It is not a service, not a linter you install as a project dependency, and not a substitute for the target repo's own tests.
+
+| Not this | What happens instead |
+|---|---|
+| A hosted QC product, SLA, or dashboard | The agent loads `SKILL.md` against a target repo |
+| `npx skills add` runs an audit | It copies skill folders. Say "harden" or `/qc-hardening` in that agent |
+| `verify_ledger.py` runs the 14 passes | Scripts recompute artifacts **after** a run. If they disagree with the JSON, fix the JSON |
+| Features, architecture, or behavior change | Law 1: harden what exists |
+| Production chaos, Game Days, invented monitoring | Chaos is in-repo tests |
+| Docs for a hoped design, invented SLAs, or recovery the code cannot do | Docs record the system as found, including Known limitations from prior ledgers |
+| Packaging that rewrites product code | Packaging is a Python distribution wrap with zero functional change |
+| Reconstruction PDFs as a second design | Canonical source is the `SKILL.md` trees. PDFs describe those same trees |
+| Suite `READY` after a P0 that was fixed | Suite rollup is a human-review gate: any P0 in any ledger, fixed or not, is `NOT_READY` |
+
+Seven laws, compressed: harden what exists; concrete scenario or it is not a finding; fix in place or defer; P0 blocks even if fixed; isolated commits; mechanical before deep; dual-vote to fix. Three clean passes is the expected output of clean code, not a reason to manufacture findings.
 
 ---
 
@@ -18,7 +134,7 @@ Fastest path, any agent:
 npx skills add dh-repo/qc
 ```
 
-That copies each `skills/<name>/` folder into the agent(s) you have installed. Use `-g` for a user-wide install.
+That copies each `skills/<name>/` folder into the agent(s) you have installed. Use `-g` for a user-wide install. The install does not run a QC pass. Say "harden" or `/qc-hardening` in that agent, against the target repo.
 
 A **standalone** port is `qc-core` plus one specialization (not the full pack):
 
@@ -36,7 +152,10 @@ npx skills add dh-repo/qc --skill qc-hardening -g
 | Claude Code | `~/.claude/skills/` | `.claude/skills/` |
 | Codex | `~/.codex/skills/` | `.agents/skills/` |
 | Grok Build | `~/.grok/skills/` | `.grok/skills/` |
+| Antigravity | `~/.gemini/config/skills/` | `.agents/skills/` |
 | Cursor / Copilot / Gemini CLI | `~/.cursor/skills/` or `~/.agents/skills/` | `.agents/skills/` |
+
+Antigravity loads global skills from `~/.gemini/config/skills/` ([docs](https://antigravity.google/docs/skills)), not `~/.agents/skills/`. `npx skills add -a antigravity` currently writes `~/.gemini/antigravity/skills/` (CLI: `~/.gemini/antigravity-cli/skills/`); copy or symlink into the load path if the IDE does not see the skill.
 
 Manual copy (core first, then the specialization). Destination is the matching row in the table above. Create the destination directory first so the skill folder is not flattened:
 
@@ -48,25 +167,6 @@ cp -R qc/skills/qc-hardening ~/.claude/skills/qc-hardening
 ```
 
 Claude Code can also load the repo as a plugin (`.claude-plugin/plugin.json` at the root; skills auto-discovered under `skills/`).
-
-The install does not run a QC pass. Say "harden" or `/qc-hardening` in that agent, against the target repo. A Claude plugin load may namespace the same skill as `/qc:qc-hardening`.
-
----
-
-## Skills
-
-| Skill | Tries to achieve | Use when |
-|---|---|---|
-| `qc-core` | Shared laws, ledger, verdict, profile, Discovery+Verify | Always, with any other qc-* skill |
-| `qc-hardening` | Drive residual concrete failure scenarios under sequences, dual paths, and live adapters to zero or explicit deferral | Feature work is done; before production, release, or merge |
-| `qc-coherence` | Guarantee compositional consistency and enforce previously discovered invariants | Several sessions have landed; before a release; `--scope=module` composition checks |
-| `qc-docs` | Enable a new engineer or operator to run, diagnose, recover, and hand off the system that exists | README, runbooks, or handoff docs need to match the codebase |
-| `qc-packaging` | Wrap an existing Python repo for distribution with no functional changes | Missing pyproject, CI, provenance, or release packaging |
-| `qc-all` | Roll the four specializations in legal order to one suite verdict | Full quality gate before a release |
-
-Legal suite order: **qc-packaging → qc-hardening → qc-coherence → qc-docs**.
-
-Slash-style triggers once a skill folder is installed: `/qc-core`, `/qc-hardening`, `/qc-coherence`, `/qc-docs`, `/qc-packaging`, `/qc-all`. Agents also pick them up from the `description` frontmatter. If the repo is loaded as a Claude plugin, the slash form may be `/qc:qc-hardening` instead.
 
 ---
 
