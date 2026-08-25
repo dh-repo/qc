@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -315,6 +316,37 @@ def test_port_contract() -> None:
     check("missing seed fails", len(verify_port(expected, miss, None)) >= 1)
 
 
+def test_suite_rollup_unreadable() -> None:
+    print("suite rollup errors")
+    from suite_rollup import load_ledgers
+
+    with tempfile.TemporaryDirectory() as tmp:
+        d = Path(tmp)
+        (d / "qc-hardening.json").write_text("not-json", encoding="utf-8")
+        check("bad ledger returns None", load_ledgers(d) is None)
+
+
+def test_chaos_unreadable_json_clis() -> None:
+    print("chaos unreadable json")
+    scripts = Path(__file__).resolve().parent
+    with tempfile.TemporaryDirectory() as tmp:
+        bad = Path(tmp) / "bad.json"
+        bad.write_text("not-json", encoding="utf-8")
+        cases = [
+            ([sys.executable, str(scripts / "render_profile.py"), str(bad)], 1),
+            ([sys.executable, str(scripts / "write_ledger.py"), str(Path(tmp) / "out.json"), str(bad)], 1),
+            ([sys.executable, str(scripts / "verify_port.py"), "--expected", str(bad), "--ledger", str(bad)], 1),
+            ([sys.executable, str(scripts / "partition.py"), "--reexam", "--profile", str(bad)], 1),
+        ]
+        for cmd, want in cases:
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            check(
+                f"{Path(cmd[1]).name} no traceback rc={want}",
+                r.returncode == want and "Traceback" not in (r.stderr or ""),
+                f"rc={r.returncode} err={r.stderr[-200:]}",
+            )
+
+
 def test_vendored_landing_checks_skip() -> None:
     print("vendored landing checks")
     import verify_skills as vs
@@ -369,6 +401,8 @@ def main() -> int:
     test_git_changed()
     test_profile()
     test_port_contract()
+    test_suite_rollup_unreadable()
+    test_chaos_unreadable_json_clis()
     test_vendored_landing_checks_skip()
     test_docs_contract()
     print(f"\n{passed} PASS, {failed} FAIL")

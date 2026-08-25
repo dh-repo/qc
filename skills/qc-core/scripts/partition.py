@@ -16,6 +16,7 @@ import ast
 import json
 import re
 import subprocess
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -331,7 +332,11 @@ def main(argv: list[str] | None = None) -> int:
         anchors: set[str] = set()
         profile_path = Path(args.profile) if args.profile else root / ".qc-profile.json"
         if profile_path.is_file():
-            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            try:
+                profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                print(f"FAIL: unreadable profile {profile_path}: {exc}", file=sys.stderr)
+                return 1
             anchors |= anchors_from_profile(profile)
         if args.anchors:
             anchors |= {a.strip().replace("\\", "/") for a in args.anchors.split(",") if a.strip()}

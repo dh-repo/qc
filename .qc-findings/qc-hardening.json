@@ -54,6 +54,50 @@
       "what": "ruff F601 repeated dict key 'fixed' in a discarded setup object; F841 unused ts_groups",
       "fix": "Remove the dead dict and unused assignment",
       "fixed": true
+    },
+    {
+      "id": "F12.1",
+      "pass": 12,
+      "scope": "module",
+      "severity": "P1",
+      "confidence": "proven",
+      "file": "skills/qc-core/scripts/partition.py",
+      "line": 334,
+      "what": "After suite_rollup fail-closed on bad JSON, the same json.loads pattern still traceback'd in render_profile, verify_port, partition, and write_ledger",
+      "why": "Pass 3 fixed one CLI. The other ingest paths still assumed well-formed JSON.",
+      "scenario": {
+        "trigger": "Feed truncated JSON to render_profile.py, verify_port.py --expected, partition.py --profile, or write_ledger.py <src.json> after suite_rollup already fail-closes on the same class of input",
+        "violated_invariant": "Every JSON ingest CLI fail-closes with FAIL and exit 1; none traceback",
+        "observable": "JSONDecodeError (and on partition, NameError: sys) on stderr; dest files may be untouched or the process aborts mid-registry"
+      },
+      "fix": "Catch OSError/ValueError on those CLIs; import sys in partition.py; chaos tests assert no Traceback",
+      "fixed": true,
+      "related_findings": [
+        "F3.1",
+        "F13.1"
+      ]
+    },
+    {
+      "id": "F13.1",
+      "pass": 13,
+      "scope": "module",
+      "severity": "P1",
+      "confidence": "proven",
+      "file": "skills/qc-core/scripts/partition.py",
+      "line": 337,
+      "what": "partition.py --reexam --profile <truncated.json> raised NameError: sys is not defined while handling JSONDecodeError",
+      "why": "The fail-closed print used sys.stderr but partition.py did not import sys.",
+      "scenario": {
+        "trigger": "Write truncated JSON to a profile file and run partition.py --reexam --profile on it (production-shaped: operator passes a half-written .qc-profile.json)",
+        "violated_invariant": "Error handlers do not introduce a second exception; fail-closed uses imported names only",
+        "observable": "Traceback chaining JSONDecodeError into NameError; exit 1 without the FAIL: unreadable profile line completing"
+      },
+      "fix": "import sys; chaos test covers partition.py --profile bad.json",
+      "fixed": true,
+      "related_findings": [
+        "F12.1",
+        "F3.1"
+      ]
     }
   ],
   "examined": [
@@ -88,6 +132,22 @@
     {
       "artifact": "skills/qc-core/scripts/test_core.py",
       "invariant": "test_core.py is ruff-clean; suite algebra fixtures do not rely on duplicate dict keys"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/render_profile.py",
+      "invariant": "Unreadable profile JSON prints FAIL and exits 1; markdown is not written"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/verify_port.py",
+      "invariant": "Unreadable expected/ledger/profile prints FAIL and exits 1"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/partition.py",
+      "invariant": "Unreadable --profile JSON prints FAIL on stderr and exits 1 without NameError"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/write_ledger.py",
+      "invariant": "Unreadable stdin or src JSON prints FAIL and does not replace dest"
     }
   ],
   "verdict": "READY_WITH_DEBT"

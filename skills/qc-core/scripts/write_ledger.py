@@ -19,10 +19,14 @@ def main(argv: list[str]) -> int:
         print(__doc__, file=sys.stderr)
         return 2
     dest = argv[1]
-    if len(argv) == 3:
-        obj = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
-    else:
-        obj = json.load(sys.stdin)
+    try:
+        if len(argv) == 3:
+            obj = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
+        else:
+            obj = json.load(sys.stdin)
+    except (OSError, ValueError) as exc:
+        print(f"FAIL: unreadable JSON: {exc}", file=sys.stderr)
+        return 1
     atomic_write_json(dest, obj)
     print(f"OK: wrote {dest}")
     return 0

@@ -68,9 +68,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ledger", required=True)
     parser.add_argument("--profile", default=None)
     args = parser.parse_args(argv)
-    expected = json.loads(Path(args.expected).read_text(encoding="utf-8"))
-    ledger = json.loads(Path(args.ledger).read_text(encoding="utf-8"))
-    profile = json.loads(Path(args.profile).read_text(encoding="utf-8")) if args.profile else None
+    try:
+        expected = json.loads(Path(args.expected).read_text(encoding="utf-8"))
+        ledger = json.loads(Path(args.ledger).read_text(encoding="utf-8"))
+        profile = json.loads(Path(args.profile).read_text(encoding="utf-8")) if args.profile else None
+    except (OSError, ValueError) as exc:
+        print(f"FAIL: unreadable input: {exc}", file=sys.stderr)
+        return 1
     found = verify(expected, ledger, profile)
     if found:
         print("FAIL: port did not recover the seeded set", file=sys.stderr)

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
@@ -98,7 +99,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("profile", nargs="?", default=".qc-profile.json")
     parser.add_argument("--out", default=".qc-profile.md")
     args = parser.parse_args(argv)
-    profile = json.loads(Path(args.profile).read_text(encoding="utf-8"))
+    try:
+        profile = json.loads(Path(args.profile).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"FAIL: unreadable profile {args.profile}: {exc}", file=sys.stderr)
+        return 1
     Path(args.out).write_text(render(profile), encoding="utf-8")
     print(f"OK: {args.out}")
     return 0

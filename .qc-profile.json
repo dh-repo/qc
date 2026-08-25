@@ -1,8 +1,82 @@
 {
   "schema_version": "1.1",
-  "updated_at": "2026-08-25T05:28:03Z",
+  "updated_at": "2026-08-25T05:33:04Z",
   "examination": {
-    "qc-hardening": {}
+    "qc-hardening": {
+      "skills/qc-core/scripts/qc.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "compute_verdict is the single verdict algorithm; presence P0 blocks even when fixed; atomic_write_json uses temp+fsync+replace",
+        "assumptions": "callers pass a list of finding dicts and the correct p0_policy; dest directories are writable",
+        "sequence_risk": "read-modify-write of a ledger is safe because replace is atomic; two writers last-write-wins"
+      },
+      "skills/qc-core/scripts/verify_ledger.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "verify() fail-closes on missing or non-JSON ledgers and recomputes verdict via qc.compute_verdict",
+        "assumptions": "schema file is readable or jsonschema is optional; qc-all ledgers may state SKIPPED/READY without local recompute",
+        "sequence_risk": "calling verify then overwrite is the documented loop; mismatch is a ledger bug not a script bug"
+      },
+      "skills/qc-core/scripts/verify_skills.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "landing checks run only when README.md and docs/qc-core.pdf exist at pack root; vendored sibling layouts skip them",
+        "assumptions": "SKILLS_DIR is the parent of qc-core; glob qc-*/ finds every specialization next to it",
+        "sequence_risk": "running landing checks then skill-contract checks: missing README must not abort the remaining registry",
+        "finding_ids": [
+          "F1.1"
+        ]
+      },
+      "skills/qc-core/scripts/partition.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "reexam_set is changed files plus import-graph neighbors already in hot_spots/pass_debt; mixed-language groups are forbidden",
+        "assumptions": "git is available for --since; profile JSON is well-formed or the CLI fail-closes",
+        "sequence_risk": "truncated profile then --reexam must print FAIL not traceback (including NameError on sys)"
+      },
+      "skills/qc-core/scripts/suite_rollup.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "unreadable ledgers fail closed; suite_verdict comes only from qc.suite_verdict",
+        "assumptions": "findings-dir contains LEGAL_ORDER json files or they are listed in skipped",
+        "sequence_risk": "corrupt ledger then rollup must not emit a partial _rollup.json"
+      },
+      "skills/qc-core/scripts/write_ledger.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "write_ledger.py only writes via qc.atomic_write_json; junk stdin/src fails closed",
+        "assumptions": "dest parent is creatable; stdin is a JSON object",
+        "sequence_risk": "partial stdin then write must not replace dest with truncated JSON"
+      },
+      "skills/qc-core/scripts/verify_port.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "verify() reports every missed planted finding; unreadable expected/ledger/profile fail closed",
+        "assumptions": "expected.json uses file_substring/severity/what_contains; clean artifacts have substantive invariants",
+        "sequence_risk": "bad expected path then --ledger must not traceback"
+      },
+      "skills/qc-core/scripts/verify_profile.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "hardening EXAMINED rows require Carmack 5Q or invariant+assumptions+sequence_risk; closed deferred codes only",
+        "assumptions": "profile is JSON object schema 1.1",
+        "sequence_risk": "verify then render: render must not treat a failing profile as authoritative markdown"
+      },
+      "skills/qc-core/scripts/render_profile.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "render_profile.py is generated output; JSON is source of truth; unreadable profile fail-closes",
+        "assumptions": "profile keys used by render are optional with empty defaults",
+        "sequence_risk": "missing profile then --out must not write a truncated markdown file"
+      },
+      "skills/qc-all/references/scripts/append_history.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:27:31Z-1525929",
+        "invariant": "history appends one JSON line then trims to max-lines via temp+replace; malformed rollup exits 1",
+        "assumptions": "history path parent is writable; rollup has run_id and git_sha",
+        "sequence_risk": "crash between append and trim can leave one extra line; next run trims"
+      }
+    }
   },
   "pass_streaks": {},
   "hot_spots": [
@@ -13,6 +87,15 @@
       ],
       "rationale": "Landing checks assumed pack-root README; vendored sibling layout crashed",
       "runs": 1
+    },
+    {
+      "artifact": "skills/qc-core/scripts/partition.py",
+      "finding_ids": [
+        "F12.1",
+        "F13.1"
+      ],
+      "rationale": "unguarded JSON ingest plus missing sys import on the error path",
+      "runs": 1
     }
   ],
   "pass_debt": [
@@ -22,10 +105,30 @@
       "should_have_been": "pass-3",
       "module": "skills/qc-core/scripts/verify_skills.py",
       "why_missed": "Pass 3 inventories FileNotFoundError on read_text per file but did not look at the second parent directory used when qc-core is vendored next to specializations"
+    },
+    {
+      "finding_id": "F12.1",
+      "found_by": "pass-12",
+      "should_have_been": "pass-3",
+      "module": "skills/qc-core/scripts/partition.py",
+      "why_missed": "Pass 3 fixed suite_rollup.json.load but did not grep the same unguarded json.loads ingest in render_profile, verify_port, partition, and write_ledger"
     }
   ],
   "deferred": [],
-  "run_history": [],
+  "run_history": [
+    {
+      "run_id": "2026-08-25T05:27:31Z-1525929",
+      "skill": "qc-hardening",
+      "verdict": "READY_WITH_DEBT",
+      "findings": {
+        "P0": 0,
+        "P1": 3,
+        "P2": 3,
+        "P3": 0
+      },
+      "git_sha": "fda3b7be35c6"
+    }
+  ],
   "invariants": [
     {
       "id": "INV-VS-1",
@@ -33,10 +136,27 @@
       "source": "test",
       "status": "enforced",
       "enforced_by": "test_vendored_landing_checks_skip"
+    },
+    {
+      "id": "INV-JSON-1",
+      "statement": "Every qc-core JSON ingest CLI fail-closes on OSError or ValueError with FAIL on stderr and a non-zero exit; it does not traceback",
+      "source": "test",
+      "status": "enforced",
+      "enforced_by": "test_chaos_unreadable_json_clis"
     }
   ],
   "canonical_forms": [],
   "clusters": [],
   "truth_map": [],
-  "operating_facts": []
+  "operating_facts": [],
+  "maintainability_trend": [
+    {
+      "run_id": "2026-08-25T05:27:31Z-1525929",
+      "consistency": "B",
+      "maintainability": "B",
+      "overall": "B",
+      "release": "READY_WITH_DEBT",
+      "rationale": "Landing checks and JSON ingest assumed the pack checkout and well-formed files. A vendored install or truncated profile forced whole-script context (verify_skills abort; partition NameError). Local fail-closed fixes, no architecture change."
+    }
+  ]
 }
