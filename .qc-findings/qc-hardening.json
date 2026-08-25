@@ -21,6 +21,17 @@
       },
       "fix": "Detect pack checkout (README.md + docs/qc-core.pdf). Skip landing checks otherwise. Never read README without exists().",
       "fixed": true
+    },
+    {
+      "id": "F2.1",
+      "pass": 2,
+      "severity": "P2",
+      "confidence": "mechanical",
+      "file": ".gitignore",
+      "line": 1,
+      "what": ".gitignore did not cover .env, *.pem, or *.key",
+      "fix": "Add .env, .env.*, !.env.example, *.pem, *.key",
+      "fixed": true
     }
   ],
   "examined": [
@@ -43,6 +54,10 @@
     {
       "artifact": "skills/qc-core/scripts/suite_rollup.py",
       "invariant": "suite_verdict is computed from per-skill ledgers via qc.suite_verdict; missing non-skipped ledgers fail closed"
+    },
+    {
+      "artifact": ".gitignore",
+      "invariant": "Secret-bearing filenames (.env, *.pem, *.key) are gitignored; planted fixture secrets stay in skills/qc-core/fixtures/"
     }
   ],
   "verdict": "READY_WITH_DEBT"
