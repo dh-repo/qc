@@ -43,6 +43,17 @@
       "what": "suite_rollup.py raised JSONDecodeError on a truncated ledger; verify_ledger.py reports FAIL on the same input",
       "fix": "Catch OSError/ValueError on ledger and skipped-list reads; print FAIL and exit 1",
       "fixed": true
+    },
+    {
+      "id": "F4.1",
+      "pass": 4,
+      "severity": "P2",
+      "confidence": "mechanical",
+      "file": "skills/qc-core/scripts/test_core.py",
+      "line": 70,
+      "what": "ruff F601 repeated dict key 'fixed' in a discarded setup object; F841 unused ts_groups",
+      "fix": "Remove the dead dict and unused assignment",
+      "fixed": true
     }
   ],
   "examined": [
@@ -73,6 +84,10 @@
     {
       "artifact": "skills/qc-core/scripts/suite_rollup.py",
       "invariant": "Unreadable or non-JSON ledgers fail closed with FAIL on stderr and exit 1; they do not traceback"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/test_core.py",
+      "invariant": "test_core.py is ruff-clean; suite algebra fixtures do not rely on duplicate dict keys"
     }
   ],
   "verdict": "READY_WITH_DEBT"

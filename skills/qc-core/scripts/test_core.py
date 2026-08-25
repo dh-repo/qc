@@ -67,11 +67,6 @@ def test_suite_algebra() -> None:
     print("suite algebra")
     hardening = {
         "verdict": "NOT_READY",
-        "findings": [{"severity": "P0", "fixed": True, "id": "F2.1", "file": "a.py", "what": "secret", "fixed": True}],
-    }
-    # the dict above duplicated fixed; rebuild cleanly
-    hardening = {
-        "verdict": "NOT_READY",
         "findings": [
             {"id": "F2.1", "severity": "P0", "file": "a.py", "what": "secret in file", "fixed": True}
         ],
@@ -179,7 +174,6 @@ def test_partition() -> None:
             if "a.py" in names or "b.py" in names:
                 coupled = names
         check("a.py and b.py stay together", coupled is not None and "a.py" in coupled and "b.py" in coupled)
-        ts_groups = [g for g in groups if g["language"] == "ts" or any(f.endswith(".ts") for f in g["files"])]
         check(
             "language boundary respected",
             any(f.endswith("other.ts") for g in groups for f in g["files"]),
