@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.1",
+  "skill": "qc-coherence",
+  "run_id": "2026-08-25T05:37:11Z-bec33ec",
+  "git_sha": "bec33ec91f98",
+  "findings": [
+    {
+      "id": "S4.1",
+      "scope": "codebase",
+      "severity": "P1",
+      "confidence": "mechanical",
+      "file": "skills/qc-core/scripts/verify_skills.py",
+      "line": 494,
+      "what": "# type: ignore[operator] on REGISTRY dispatch had no explanatory comment",
+      "fix": "Add comment: REGISTRY values are untyped callables",
+      "fixed": true
+    },
+    {
+      "id": "M2.1",
+      "scope": "codebase",
+      "severity": "P2",
+      "confidence": "pattern",
+      "file": "skills/qc-all/references/scripts/append_history.py",
+      "line": 80,
+      "what": "append_history.py printed ERROR: on unreadable JSON; qc-core CLIs print FAIL: for the same ingest-failure class",
+      "why": "Operator-facing failure prefix drifted across the suite boundary",
+      "scenario": {
+        "trigger": "Feed unreadable JSON to append_history.py after suite_rollup.py / verify_ledger.py already fail-closed with FAIL: on the same class of input",
+        "violated_invariant": "Equivalent ingest failures print the same stderr prefix across suite CLIs",
+        "observable": "append_history printed ERROR: while qc-core printed FAIL:; grep FAIL misses the history failure"
+      },
+      "fix": "Print FAIL: for malformed rollup, unreadable file, and I/O write errors",
+      "fixed": true,
+      "related_findings": [
+        "F3.1",
+        "F12.1"
+      ]
+    },
+    {
+      "id": "S3.1",
+      "scope": "codebase",
+      "severity": "P2",
+      "confidence": "pattern",
+      "file": "skills/qc-core/scripts/suite_rollup.py",
+      "line": 42,
+      "what": "Fail-closed json.loads is copy-pasted across suite_rollup, render_profile, verify_port, partition, write_ledger; no shared helper",
+      "why": "F12.1 happened because Pass 3 patched one copy. A shared ingest helper does not exist.",
+      "scenario": {
+        "trigger": "A new CLI adds json.loads without the fail-closed wrapper, while the five existing CLIs already catch OSError/ValueError",
+        "violated_invariant": "The JSON ingest contract is one implementation, not N copies",
+        "observable": "The new CLI traceback's on truncated JSON; the others print FAIL:"
+      },
+      "fix": "Extract a helper in qc.py",
+      "fixed": false,
+      "deferred_because": "accepted-debt: five copies now fail-closed independently; extracting a helper is a refactor with no remaining defect",
+      "related_findings": [
+        "F12.1",
+        "F3.1"
+      ]
+    },
+    {
+      "id": "S4.2",
+      "scope": "codebase",
+      "severity": "P2",
+      "confidence": "mechanical",
+      "file": "skills/qc-core/scripts/qc.py",
+      "line": 1,
+      "what": "qc-core production scripts have no mypy config and almost no type annotations (S4 95% floor unmet)",
+      "fix": "Do not start a typing campaign in this audit",
+      "fixed": false,
+      "deferred_because": "accepted-debt: no type checker is part of this pack's toolchain; ratchet not started"
+    }
+  ],
+  "examined": [
+    {
+      "artifact": "skills/qc-core/scripts/qc.py",
+      "invariant": "qc.py is the only compute_verdict; it imports stdlib only and is the kernel layer"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/verify_ledger.py",
+      "invariant": "verify_ledger fail-closes on missing/non-JSON ledgers and recomputes via qc.compute_verdict"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/verify_skills.py",
+      "invariant": "landing checks skip when README.md+docs/qc-core.pdf are absent; skill-contract checks still run"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/partition.py",
+      "invariant": "import-graph partition never mixes languages; unreadable --profile fail-closes"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/suite_rollup.py",
+      "invariant": "unreadable ledgers fail closed; suite_verdict comes only from qc.suite_verdict"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/write_ledger.py",
+      "invariant": "write_ledger only writes via atomic_write_json; junk JSON fail-closes"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/verify_port.py",
+      "invariant": "port acceptance recovers planted findings; unreadable inputs fail-closed"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/verify_profile.py",
+      "invariant": "hardening EXAMINED requires Carmack 5Q or compact triple"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/render_profile.py",
+      "invariant": "markdown is generated; JSON is source of truth; unreadable profile fail-closes"
+    },
+    {
+      "artifact": "skills/qc-all/references/scripts/append_history.py",
+      "invariant": "history appends one JSON line then trims via temp+replace; ingest failures print FAIL:"
+    },
+    {
+      "artifact": "skills/qc-all/references/scripts/verify_ledger.py",
+      "invariant": "shim execs qc-core verify_ledger.py with the same argv; no local verdict math"
+    },
+    {
+      "artifact": "skills/qc-all/references/scripts/verify_skills.py",
+      "invariant": "shim execs qc-core verify_skills.py with the same argv"
+    },
+    {
+      "artifact": "C1-interfaces",
+      "invariant": "This pack has no abc.ABC or typing.Protocol with 2+ implementations; JSON ingest is an implicit CLI contract, not a Protocol"
+    }
+  ],
+  "verdict": "READY_WITH_DEBT"
+}

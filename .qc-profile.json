@@ -1,6 +1,6 @@
 {
   "schema_version": "1.1",
-  "updated_at": "2026-08-25T05:33:04Z",
+  "updated_at": "2026-08-25T05:37:11Z",
   "examination": {
     "qc-hardening": {
       "skills/qc-core/scripts/qc.py": {
@@ -76,6 +76,73 @@
         "assumptions": "history path parent is writable; rollup has run_id and git_sha",
         "sequence_risk": "crash between append and trim can leave one extra line; next run trims"
       }
+    },
+    "qc-coherence": {
+      "skills/qc-core/scripts/qc.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "qc.py is the only compute_verdict; it imports stdlib only and is the kernel layer"
+      },
+      "skills/qc-core/scripts/verify_ledger.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "verify_ledger fail-closes on missing/non-JSON ledgers and recomputes via qc.compute_verdict"
+      },
+      "skills/qc-core/scripts/verify_skills.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "landing checks skip when README.md+docs/qc-core.pdf are absent; skill-contract checks still run"
+      },
+      "skills/qc-core/scripts/partition.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "import-graph partition never mixes languages; unreadable --profile fail-closes"
+      },
+      "skills/qc-core/scripts/suite_rollup.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "unreadable ledgers fail closed; suite_verdict comes only from qc.suite_verdict"
+      },
+      "skills/qc-core/scripts/write_ledger.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "write_ledger only writes via atomic_write_json; junk JSON fail-closes"
+      },
+      "skills/qc-core/scripts/verify_port.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "port acceptance recovers planted findings; unreadable inputs fail-closed"
+      },
+      "skills/qc-core/scripts/verify_profile.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "hardening EXAMINED requires Carmack 5Q or compact triple"
+      },
+      "skills/qc-core/scripts/render_profile.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "markdown is generated; JSON is source of truth; unreadable profile fail-closes"
+      },
+      "skills/qc-all/references/scripts/append_history.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "history appends one JSON line then trims via temp+replace; ingest failures print FAIL:"
+      },
+      "skills/qc-all/references/scripts/verify_ledger.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "shim execs qc-core verify_ledger.py with the same argv; no local verdict math"
+      },
+      "skills/qc-all/references/scripts/verify_skills.py": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "shim execs qc-core verify_skills.py with the same argv"
+      },
+      "C1-interfaces": {
+        "status": "EXAMINED",
+        "run_id": "2026-08-25T05:37:11Z-bec33ec",
+        "invariant": "This pack has no abc.ABC or typing.Protocol with 2+ implementations; JSON ingest is an implicit CLI contract, not a Protocol"
+      }
     }
   },
   "pass_streaks": {},
@@ -114,7 +181,29 @@
       "why_missed": "Pass 3 fixed suite_rollup.json.load but did not grep the same unguarded json.loads ingest in render_profile, verify_port, partition, and write_ledger"
     }
   ],
-  "deferred": [],
+  "deferred": [
+    {
+      "id": "S3.1",
+      "skill": "qc-coherence",
+      "severity": "P2",
+      "code": "accepted-debt",
+      "detail": "five fail-closed JSON ingest copies; no shared helper",
+      "related_findings": [
+        "S3.1",
+        "F12.1"
+      ]
+    },
+    {
+      "id": "S4.2",
+      "skill": "qc-coherence",
+      "severity": "P2",
+      "code": "accepted-debt",
+      "detail": "no mypy/type-annotation ratchet on qc-core scripts",
+      "related_findings": [
+        "S4.2"
+      ]
+    }
+  ],
   "run_history": [
     {
       "run_id": "2026-08-25T05:27:31Z-1525929",
@@ -127,6 +216,18 @@
         "P3": 0
       },
       "git_sha": "fda3b7be35c6"
+    },
+    {
+      "run_id": "2026-08-25T05:37:11Z-bec33ec",
+      "skill": "qc-coherence",
+      "verdict": "READY_WITH_DEBT",
+      "findings": {
+        "P0": 0,
+        "P1": 1,
+        "P2": 3,
+        "P3": 0
+      },
+      "git_sha": "bec33ec91f98"
     }
   ],
   "invariants": [
@@ -143,10 +244,70 @@
       "source": "test",
       "status": "enforced",
       "enforced_by": "test_chaos_unreadable_json_clis"
+    },
+    {
+      "id": "INV-VERDICT-1",
+      "statement": "compute_verdict is defined only in qc-core/scripts/qc.py; specializations must not reimplement it",
+      "source": "test",
+      "status": "enforced",
+      "enforced_by": "check_single_compute_verdict"
     }
   ],
-  "canonical_forms": [],
-  "clusters": [],
+  "canonical_forms": [
+    {
+      "concept": "cli-failure-prefix",
+      "canonical": "FAIL:",
+      "aliases": [
+        "ERROR:"
+      ],
+      "cluster_id": "CL-FAIL-PREFIX"
+    },
+    {
+      "concept": "json-ingest-failure",
+      "canonical": "catch OSError/ValueError; print FAIL:; exit 1",
+      "aliases": [],
+      "cluster_id": "CL-JSON-INGEST"
+    },
+    {
+      "concept": "verdict",
+      "canonical": "READY|READY_WITH_DEBT|NOT_READY|SKIPPED",
+      "aliases": [
+        "COHERENT",
+        "DRIFTING",
+        "ACTION REQUIRED"
+      ]
+    },
+    {
+      "concept": "ledger-schema",
+      "canonical": "1.1",
+      "aliases": [
+        "1.0"
+      ]
+    }
+  ],
+  "clusters": [
+    {
+      "id": "CL-FAIL-PREFIX",
+      "skill": "qc-coherence",
+      "symbols": [
+        "FAIL:",
+        "ERROR:"
+      ],
+      "rationale": "Both are the stderr prefix for unreadable-input / I/O failure on suite CLIs; they name the same operator-facing failure class"
+    },
+    {
+      "id": "CL-JSON-INGEST",
+      "skill": "qc-coherence",
+      "symbols": [
+        "suite_rollup.load_ledgers",
+        "render_profile.main",
+        "verify_port.main",
+        "partition.main",
+        "write_ledger.main"
+      ],
+      "rationale": "Same ingest contract: JSON file or stdin must be an object; OSError/ValueError fail-closes with FAIL:"
+    }
+  ],
   "truth_map": [],
   "operating_facts": [],
   "maintainability_trend": [
@@ -158,5 +319,21 @@
       "release": "READY_WITH_DEBT",
       "rationale": "Landing checks and JSON ingest assumed the pack checkout and well-formed files. A vendored install or truncated profile forced whole-script context (verify_skills abort; partition NameError). Local fail-closed fixes, no architecture change."
     }
-  ]
+  ],
+  "layer_model": {
+    "layers": [
+      "kernel",
+      "cli",
+      "shims",
+      "fixtures",
+      "workflows"
+    ],
+    "rules": [
+      "cli may import kernel (qc.py)",
+      "kernel must not import cli",
+      "shims exec cli and contain no verdict math",
+      "fixtures are isolated planted repos and must not be imported by kernel or cli",
+      "workflows (discovery-verify.js) must not import the Python kernel"
+    ]
+  }
 }
