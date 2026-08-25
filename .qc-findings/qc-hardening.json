@@ -32,6 +32,17 @@
       "what": ".gitignore did not cover .env, *.pem, or *.key",
       "fix": "Add .env, .env.*, !.env.example, *.pem, *.key",
       "fixed": true
+    },
+    {
+      "id": "F3.1",
+      "pass": 3,
+      "severity": "P2",
+      "confidence": "mechanical",
+      "file": "skills/qc-core/scripts/suite_rollup.py",
+      "line": 42,
+      "what": "suite_rollup.py raised JSONDecodeError on a truncated ledger; verify_ledger.py reports FAIL on the same input",
+      "fix": "Catch OSError/ValueError on ledger and skipped-list reads; print FAIL and exit 1",
+      "fixed": true
     }
   ],
   "examined": [
@@ -58,6 +69,10 @@
     {
       "artifact": ".gitignore",
       "invariant": "Secret-bearing filenames (.env, *.pem, *.key) are gitignored; planted fixture secrets stay in skills/qc-core/fixtures/"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/suite_rollup.py",
+      "invariant": "Unreadable or non-JSON ledgers fail closed with FAIL on stderr and exit 1; they do not traceback"
     }
   ],
   "verdict": "READY_WITH_DEBT"
