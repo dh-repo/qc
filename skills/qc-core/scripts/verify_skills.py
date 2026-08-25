@@ -491,7 +491,7 @@ def main() -> None:
     print(f"verify_skills.py: {len(REGISTRY)} checks")
     failures = 0
     for name, fn in REGISTRY:
-        passed, msg = fn(args.skill)  # type: ignore[operator]
+        passed, msg = fn(args.skill)  # type: ignore[operator]  # REGISTRY values are untyped callables
         if args.strict and msg.startswith("WARN:"):
             passed = False
         if not passed:
