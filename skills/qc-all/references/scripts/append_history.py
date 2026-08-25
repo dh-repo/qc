@@ -77,16 +77,16 @@ def main() -> None:
     try:
         rollup = load_rollup(rollup_path)
     except ValueError as exc:
-        print(f"ERROR: malformed rollup: {exc}", file=sys.stderr)
+        print(f"FAIL: malformed rollup: {exc}", file=sys.stderr)
         sys.exit(1)
     except OSError as exc:
-        print(f"ERROR: cannot read rollup file: {exc}", file=sys.stderr)
+        print(f"FAIL: cannot read rollup file: {exc}", file=sys.stderr)
         sys.exit(2)
 
     try:
         append_to_history(rollup, history_path, args.max_lines)
     except OSError as exc:
-        print(f"ERROR: I/O error writing history: {exc}", file=sys.stderr)
+        print(f"FAIL: I/O error writing history: {exc}", file=sys.stderr)
         sys.exit(2)
 
 
