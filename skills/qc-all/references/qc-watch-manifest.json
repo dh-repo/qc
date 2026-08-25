@@ -1,0 +1,39 @@
+{
+  "qc-packaging": [
+    "pyproject.toml",
+    "package.json",
+    "setup.cfg",
+    "MANIFEST.in",
+    ".github/workflows/**/*.yml",
+    "tox.ini"
+  ],
+  "qc-docs": [
+    "README.md",
+    "docs/**/*.md",
+    "**/*.py",
+    "**/*.ts",
+    "**/*.js",
+    "**/*.go",
+    "**/*.rs"
+  ],
+  "qc-hardening": [
+    "src/**/*",
+    "tests/**/*",
+    "**/*.py",
+    "**/*.ts",
+    "**/*.js",
+    "**/*.go",
+    "**/*.rs"
+  ],
+  "qc-coherence": [
+    "src/**/*",
+    "config/**/*.yaml",
+    "pyproject.toml",
+    "package.json",
+    "**/*.py",
+    "**/*.ts",
+    "**/*.js",
+    "**/*.go",
+    "**/*.rs"
+  ]
+}

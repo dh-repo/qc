@@ -1,0 +1,5 @@
+def buggy_function() -> None:
+    unused_var = 42
+    another_unused = "hello"
+    yet_another = [1, 2, 3]
+    return

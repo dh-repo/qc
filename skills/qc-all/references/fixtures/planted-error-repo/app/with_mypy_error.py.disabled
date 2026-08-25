@@ -1,0 +1,2 @@
+def compute_id(name: str) -> int:
+    return "id_" + name  # intentional type error: returns str, not int
