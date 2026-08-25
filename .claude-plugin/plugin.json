@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "description": "Quality-control skill suite: packaging, docs, hardening, and coherence. Agent Skills format for Claude, Codex, Grok, and other SKILL.md clients.",
   "author": {
-    "name": "Lefturn"
+    "name": "dh-repo"
   },
-  "homepage": "https://github.com/Lefturn-Agents/qc",
-  "repository": "https://github.com/Lefturn-Agents/qc",
+  "homepage": "https://github.com/dh-repo/qc",
+  "repository": "https://github.com/dh-repo/qc",
   "license": "MIT",
   "keywords": [
     "quality",

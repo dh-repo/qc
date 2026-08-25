@@ -9,15 +9,15 @@ This is not a hosted product. The agent follows the skill; a small Python harnes
 Fastest path, any agent:
 
 ```bash
-npx skills add Lefturn-Agents/qc
+npx skills add dh-repo/qc
 ```
 
 That copies each `skills/<name>/` folder into the agent(s) you have installed (Claude Code, Codex, Grok, Cursor, …). Use `-g` for a user-wide install.
 
 ```bash
-npx skills add Lefturn-Agents/qc -g
-npx skills add Lefturn-Agents/qc --skill qc-hardening
-npx skills add Lefturn-Agents/qc --list
+npx skills add dh-repo/qc -g
+npx skills add dh-repo/qc --skill qc-hardening
+npx skills add dh-repo/qc --list
 ```
 
 ### By agent
@@ -32,7 +32,7 @@ npx skills add Lefturn-Agents/qc --list
 Manual copy (equivalent to a per-skill install):
 
 ```bash
-git clone https://github.com/Lefturn-Agents/qc.git
+git clone https://github.com/dh-repo/qc.git
 cp -R qc/skills/qc-hardening ~/.claude/skills/
 cp -R qc/skills/qc-hardening ~/.codex/skills/
 cp -R qc/skills/qc-hardening ~/.grok/skills/
@@ -40,7 +40,7 @@ cp -R qc/skills/qc-hardening ~/.grok/skills/
 
 Claude Code can also load the repo as a plugin (`.claude-plugin/plugin.json` at the root; skills auto-discovered under `skills/`).
 
-Each skill is self-contained. `npx skills add Lefturn-Agents/qc --skill qc-hardening` is enough to run hardening; you do not need the rest of the suite unless you want `qc-all` to roll the four skills up.
+Each skill is self-contained. `npx skills add dh-repo/qc --skill qc-hardening` is enough to run hardening; you do not need the rest of the suite unless you want `qc-all` to roll the four skills up.
 
 ## Skills
 
