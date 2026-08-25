@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.1",
+  "updated_at": "2026-08-25T05:28:03Z",
+  "examination": {
+    "qc-hardening": {}
+  },
+  "pass_streaks": {},
+  "hot_spots": [
+    {
+      "artifact": "skills/qc-core/scripts/verify_skills.py",
+      "finding_ids": [
+        "F1.1"
+      ],
+      "rationale": "Landing checks assumed pack-root README; vendored sibling layout crashed",
+      "runs": 1
+    }
+  ],
+  "pass_debt": [
+    {
+      "finding_id": "F1.1",
+      "found_by": "pass-1",
+      "should_have_been": "pass-3",
+      "module": "skills/qc-core/scripts/verify_skills.py",
+      "why_missed": "Pass 3 inventories FileNotFoundError on read_text per file but did not look at the second parent directory used when qc-core is vendored next to specializations"
+    }
+  ],
+  "deferred": [],
+  "run_history": [],
+  "invariants": [
+    {
+      "id": "INV-VS-1",
+      "statement": "verify_skills landing checks run only when README.md and docs/qc-core.pdf sit at the pack root; a vendored sibling layout skips them and still finishes skill-contract checks",
+      "source": "test",
+      "status": "enforced",
+      "enforced_by": "test_vendored_landing_checks_skip"
+    }
+  ],
+  "canonical_forms": [],
+  "clusters": [],
+  "truth_map": [],
+  "operating_facts": []
+}

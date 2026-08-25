@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.1",
+  "skill": "qc-hardening",
+  "run_id": "2026-08-25T05:27:31Z-1525929",
+  "git_sha": "15259297d51f",
+  "findings": [
+    {
+      "id": "F1.1",
+      "pass": 1,
+      "scope": "module",
+      "severity": "P1",
+      "confidence": "proven",
+      "file": "skills/qc-core/scripts/verify_skills.py",
+      "line": 353,
+      "what": "verify_skills.py raises FileNotFoundError on check_readme_links_exist when the skill tree is vendored without the pack README",
+      "why": "Landing checks assume SKILLS_DIR.parent is the GitHub pack root. A sibling-only standalone port has no README there. check_readme_docs_contract fails softly, then check_readme_links_exist reads the missing file and aborts the remaining registry.",
+      "scenario": {
+        "trigger": "Copy qc-core plus specializations into an agent skills directory (documented standalone port), then run python3 qc-core/scripts/verify_skills.py",
+        "violated_invariant": "Skill-tree verification completes every registry check; missing pack landing files skip landing checks instead of raising",
+        "observable": "FileNotFoundError for <parent>/README.md; process exits 1; later checks including core_self_test never run"
+      },
+      "fix": "Detect pack checkout (README.md + docs/qc-core.pdf). Skip landing checks otherwise. Never read README without exists().",
+      "fixed": true
+    }
+  ],
+  "examined": [
+    {
+      "artifact": "skills/qc-core/scripts/qc.py",
+      "invariant": "compute_verdict is the only verdict algorithm; presence P0 blocks even when fixed; atomic_write_json uses temp+fsync+replace so readers never see a partial ledger"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/verify_skills.py",
+      "invariant": "Landing-doc checks run only on the GitHub pack checkout; a vendored sibling layout skips them and still completes skill-contract checks"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/partition.py",
+      "invariant": "reexam_set is changed files plus import-graph neighbors that already sit in hot_spots or pass_debt; language boundaries never mix in one group"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/write_ledger.py",
+      "invariant": "write_ledger.py delegates to qc.atomic_write_json; dest parent is created; JSON is the full object not a patch"
+    },
+    {
+      "artifact": "skills/qc-core/scripts/suite_rollup.py",
+      "invariant": "suite_verdict is computed from per-skill ledgers via qc.suite_verdict; missing non-skipped ledgers fail closed"
+    }
+  ],
+  "verdict": "READY_WITH_DEBT"
+}

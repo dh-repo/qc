@@ -321,6 +321,25 @@ def test_port_contract() -> None:
     check("missing seed fails", len(verify_port(expected, miss, None)) >= 1)
 
 
+def test_vendored_landing_checks_skip() -> None:
+    print("vendored landing checks")
+    import verify_skills as vs
+
+    orig = vs._repo_root
+    vs._repo_root = lambda: Path("/tmp/qc-not-a-pack-checkout")
+    try:
+        ok_docs, msg_docs = vs.check_readme_docs_contract(None)
+        ok_links, msg_links = vs.check_readme_links_exist(None)
+        ok_cmds, msg_cmds = vs.check_readme_python_commands(None)
+        ok_pdfs, msg_pdfs = vs.check_landing_pdfs(None)
+        check("docs contract skips", ok_docs and "skipped" in msg_docs, msg_docs)
+        check("links skip without raise", ok_links and "skipped" in msg_links, msg_links)
+        check("python commands skip", ok_cmds and "skipped" in msg_cmds, msg_cmds)
+        check("pdfs skip", ok_pdfs and "skipped" in msg_pdfs, msg_pdfs)
+    finally:
+        vs._repo_root = orig
+
+
 def test_docs_contract() -> None:
     print("docs contract")
     from verify_skills import (  # noqa: E402
@@ -356,6 +375,7 @@ def main() -> int:
     test_git_changed()
     test_profile()
     test_port_contract()
+    test_vendored_landing_checks_skip()
     test_docs_contract()
     print(f"\n{passed} PASS, {failed} FAIL")
     print("verdict:", "PASS" if failed == 0 else "FAIL")

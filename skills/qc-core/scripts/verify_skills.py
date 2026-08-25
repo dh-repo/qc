@@ -322,6 +322,16 @@ def _repo_root() -> Path:
     return SKILLS_DIR.parent
 
 
+def _is_pack_checkout() -> bool:
+    """True only when qc-core sits inside the GitHub pack (README + reconstruction PDFs).
+
+    A standalone port is qc-core plus specializations under an agent skills dir.
+    That layout has no pack README; landing checks must skip, not raise.
+    """
+    root = _repo_root()
+    return (root / "README.md").is_file() and (root / "docs" / "qc-core.pdf").is_file()
+
+
 def _extract_pdf(path: Path) -> str:
     try:
         from pypdf import PdfReader
@@ -332,9 +342,9 @@ def _extract_pdf(path: Path) -> str:
 
 
 def check_readme_docs_contract(_f: str | None) -> tuple[bool, str]:
+    if not _is_pack_checkout():
+        return True, "landing checks skipped (not the qc pack checkout)"
     readme_path = _repo_root() / "README.md"
-    if not readme_path.is_file():
-        return False, "README.md missing"
     text = readme_path.read_text(encoding="utf-8")
     if "qc-core" not in text:
         return False, "README omits qc-core"
@@ -351,6 +361,8 @@ def check_readme_docs_contract(_f: str | None) -> tuple[bool, str]:
 
 
 def check_readme_links_exist(_f: str | None) -> tuple[bool, str]:
+    if not _is_pack_checkout():
+        return True, "landing checks skipped (not the qc pack checkout)"
     readme_path = _repo_root() / "README.md"
     text = readme_path.read_text(encoding="utf-8")
     missing = []
@@ -375,6 +387,8 @@ def check_readme_links_exist(_f: str | None) -> tuple[bool, str]:
 
 
 def check_readme_python_commands(_f: str | None) -> tuple[bool, str]:
+    if not _is_pack_checkout():
+        return True, "landing checks skipped (not the qc pack checkout)"
     readme_path = _repo_root() / "README.md"
     text = readme_path.read_text(encoding="utf-8")
     scripts = list(dict.fromkeys(_PY_SKILLS_CMD.findall(text)))
@@ -387,6 +401,8 @@ def check_readme_python_commands(_f: str | None) -> tuple[bool, str]:
 
 
 def check_landing_pdfs(_f: str | None) -> tuple[bool, str]:
+    if not _is_pack_checkout():
+        return True, "landing checks skipped (not the qc pack checkout)"
     docs = _repo_root() / "docs"
     problems = []
     for name in _LANDING_PDFS:
