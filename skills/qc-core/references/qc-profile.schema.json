@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude.skills/qc-profile.schema.json",
+  "title": "QC Unified Profile",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.1" },
+    "updated_at": { "type": "string" },
+    "examination": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": { "type": "string", "enum": ["EXAMINED", "FINDING", "NOT_YET"] },
+            "run_id": { "type": "string" },
+            "invariant": { "type": "string" },
+            "finding_ids": { "type": "array", "items": { "type": "string" } },
+            "carmack": { "type": "object" }
+          }
+        }
+      }
+    },
+    "pass_streaks": { "type": "object" },
+    "hot_spots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["artifact"],
+        "properties": {
+          "artifact": { "type": "string" },
+          "finding_ids": { "type": "array", "items": { "type": "string" } },
+          "rationale": { "type": "string" },
+          "runs": { "type": "integer" }
+        }
+      }
+    },
+    "pass_debt": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding_id", "found_by", "should_have_been", "module"],
+        "properties": {
+          "finding_id": { "type": "string" },
+          "found_by": { "type": "string" },
+          "should_have_been": { "type": "string" },
+          "module": { "type": "string" },
+          "why_missed": { "type": "string" }
+        }
+      }
+    },
+    "deferred": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "skill", "severity", "code"],
+        "properties": {
+          "id": { "type": "string" },
+          "skill": { "type": "string" },
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
+          "code": { "type": "string" },
+          "detail": { "type": "string" },
+          "related_findings": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "run_history": { "type": "array" },
+    "maintainability_trend": { "type": "array" },
+    "operating_facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "fact", "source", "timestamp"],
+        "properties": {
+          "id": { "type": "string" },
+          "fact": { "type": "string" },
+          "source": { "type": "string", "enum": ["user-provided", "code", "test"] },
+          "timestamp": { "type": "string" },
+          "last_verified": { "type": "string" }
+        }
+      }
+    },
+    "clusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "skill", "symbols", "rationale"],
+        "properties": {
+          "id": { "type": "string" },
+          "skill": { "type": "string" },
+          "check": { "type": "string" },
+          "symbols": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "rationale": { "type": "string", "minLength": 8 }
+        }
+      }
+    },
+    "truth_map": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "doc", "evidence", "kind"],
+        "properties": {
+          "claim": { "type": "string" },
+          "doc": { "type": "string" },
+          "evidence": { "type": "string" },
+          "kind": { "type": "string", "enum": ["code", "test", "user-provided"] },
+          "fact_id": { "type": "string" }
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "source", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "statement": { "type": "string", "minLength": 8 },
+          "source": { "type": "string", "enum": ["carmack", "comment", "test", "doc"] },
+          "source_ref": { "type": "string" },
+          "enforced_by": { "type": "string" },
+          "status": { "type": "string", "enum": ["enforced", "untested", "deferred"] }
+        }
+      }
+    },
+    "canonical_forms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["concept", "canonical"],
+        "properties": {
+          "concept": { "type": "string" },
+          "canonical": { "type": "string" },
+          "aliases": { "type": "array", "items": { "type": "string" } },
+          "cluster_id": { "type": "string" }
+        }
+      }
+    },
+    "layer_model": {
+      "type": "object",
+      "required": ["layers"],
+      "properties": {
+        "layers": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "rules": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -5,6 +5,8 @@ description: Use for production packaging of an existing Python repository. Trig
 
 # Production Packaging for Public Release
 
+**REQUIRED:** Load `qc-core` first. Ledger, verdict, deferred vocabulary, and suite order live there. This skill wraps an existing Python repo for distribution. It runs first in `qc-all`.
+
 Package an existing Python project for public release without altering any functional code. Adds packaging metadata, documentation, CI, and developer tooling artifacts only.
 
 **Core principle:** The codebase is finished. This skill wraps it for distribution. Zero functional changes, zero domain logic changes, zero test assertion changes.
@@ -269,7 +271,7 @@ Run all checks and confirm:
 
 ## Output Contract
 
-After each validation run, write findings to `.qc-findings/qc-packaging.json` in the project root. The file must conform to schema [`references/qc-finding.schema.json`](references/qc-finding.schema.json).
+qc-core ledger at `.qc-findings/qc-packaging.json`. Packaging hits are `confidence: mechanical` or `pattern`. Verify: `python3 ../qc-core/scripts/verify_ledger.py .qc-findings/qc-packaging.json`.
 
 **Severity vocabulary:**
 
@@ -280,11 +282,9 @@ After each validation run, write findings to `.qc-findings/qc-packaging.json` in
 | Reduces quality (missing optional sections, weak CI) | P2 |
 | Minor polish (cosmetic gaps, style) | P3 |
 
-**Example finding:**
-
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "skill": "qc-packaging",
   "run_id": "2026-05-17T14:30:00Z-abc1234",
   "git_sha": "abc1234",
@@ -292,6 +292,7 @@ After each validation run, write findings to `.qc-findings/qc-packaging.json` in
     {
       "id": "P1.1",
       "severity": "P1",
+      "confidence": "mechanical",
       "file": "pyproject.toml",
       "line": 12,
       "what": "Missing [project.urls] table; PyPI page will lack homepage/repo links",
@@ -299,17 +300,11 @@ After each validation run, write findings to `.qc-findings/qc-packaging.json` in
       "fixed": true
     }
   ],
-  "verdict": "READY"
+  "verdict": "READY_WITH_DEBT"
 }
 ```
 
-**Verdict mapping:**
-
-| Skill outcome | Rollup verdict |
-|:---|:---|
-| Zero findings | `READY` |
-| Only P2/P3 findings, all fixed or `deferred_because` set | `READY_WITH_DEBT` |
-| Any P0/P1 with `fixed: false` and no `deferred_because` | `NOT_READY` |
+Verdict math is qc-core (open P0 policy for this skill). A fixed P1 is `READY_WITH_DEBT`. Suite human-gate still blocks on any P0.
 
 ## Edge Cases
 

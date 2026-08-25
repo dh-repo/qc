@@ -34,7 +34,7 @@ Stop condition: _rollup.json verdict == READY or READY_WITH_DEBT (no open P0/P1)
 | P1 | module | Fix across module; update tests. Mark `fixed: true` or set `deferred_because`. |
 | P1 | codebase | Escalate to human if fix requires architectural decision. Set `deferred_because` with owner. |
 | P2 | any | Fix if <30 min effort; otherwise set `deferred_because` with rationale. |
-| P3 | any | Defer. Set `deferred_because: "P3 — accepted cosmetic debt"`. |
+| P3 | any | Defer. Set `deferred_because: "accepted-debt: P3 cosmetic"`. |
 
 ## Findings Payload Format
 

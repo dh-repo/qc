@@ -1,7 +1,7 @@
 {
   "name": "qc",
   "version": "0.1.0",
-  "description": "Quality-control skill suite: packaging, docs, hardening, and coherence. Agent Skills format for Claude, Codex, Grok, and other SKILL.md clients.",
+  "description": "Quality-control skill suite: qc-core plus packaging, hardening, coherence, and docs. Agent Skills format for Claude, Codex, Grok, and other SKILL.md clients.",
   "author": {
     "name": "dh-repo"
   },
@@ -13,6 +13,7 @@
     "hardening",
     "docs",
     "coherence",
+    "qc-core",
     "agent-skills"
   ]
 }

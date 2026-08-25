@@ -5,7 +5,9 @@ description: Use for production documentation standardization of an existing rep
 
 # Production Docs
 
-Standardize repository documentation for production use, team handoff, and external readability without changing application behavior.
+**REQUIRED:** Load `qc-core` first. Laws, ledger, verdict, profile (`operating_facts`, `truth_map`), deferred vocabulary, and suite order live there. This skill is the documentation specialization. It runs last in `qc-all` so the truth-map matches the code that survived hardening and coherence.
+
+Produce the **minimal complete documentation set** that lets a new engineer or operator correctly understand, run, diagnose, recover, and hand off the system that actually exists. Document the **system as found**, including residual debt from prior audits — never the system as hoped. Every claim is evidence-linked; every operator-relevant surface the code exposes is covered; every known limitation from prior hardening/coherence runs is surfaced; nothing is invented.
 
 **Core principle:** Documentation must match the codebase that exists. Do not invent features, infrastructure, SLAs, or operating procedures that are not grounded in the repository or verified user input.
 
@@ -116,32 +118,35 @@ Before starting, determine which mode applies.
 - The README links to the doc set and follows the required structure.
 
 If all three conditions hold, skip the full write sequence:
-1. Run the validation matrix directly.
-2. Fix what fails, prioritized by severity tier.
-3. Run quality gates.
+1. Re-validate every existing `truth_map[]` row against current code (and `operating_facts[]` `last_verified` timestamps).
+2. Rewrite only claims whose evidence moved.
+3. Run the validation matrix and quality gates (including Gate 4).
 4. Stop when gates pass.
 
-Delta mode prevents wasted effort re-auditing and re-writing docs that are already sound. If the validation matrix reveals structural gaps (a required doc is missing, a doc is a placeholder), fall back to first-pass mode for the affected docs only.
+Delta mode is high-signal: the prior evidence map is the target, not a full rewrite. If the matrix reveals structural gaps (a required doc is missing, a doc is a placeholder), fall back to first-pass mode for the affected docs only.
 
 ### 1. Audit Before Writing
 
-Read the codebase first. Determine:
+Read the codebase first, plus **prior-skill ledgers** (`.qc-findings/qc-hardening.json`, `.qc-findings/qc-coherence.json`) and `.qc-profile.json`. Determine:
 - Actual entry points
 - Actual deployment model
 - Actual operators or users
 - Actual external dependencies
 - Actual commands that work
 - Actual persistent artifacts and outputs
+- **Operator-relevant surfaces the code exposes** (health endpoint, recovery path, config keys, error modes, scheduler, public CLI flags) — Completeness is dual: missing coverage of a code-surfaced concern is a Completeness finding, not an Accuracy finding
 
 If the repo already has docs, preserve accurate material and normalize it. Do not rewrite for style alone if the existing text is already clear and correct.
 
-### 2. Build the Documentation Map
+### 2. Build the Documentation Map (truth-map artifact)
 
-Create a simple truth map before editing:
-- What belongs in the landing page
-- What belongs in deep reference docs
-- What belongs in runbooks
+Write `truth_map[]` on `.qc-profile.json` before editing. Every **non-trivial** claim in ARCHITECTURE, OPERATIONS, API, and DATA_MODEL → evidence pointer: `file:line`, a test name, or `user-provided:<id>` referencing `operating_facts[]`. Missing pointers on those docs fail Accuracy, not just "required evidence." P1+ accuracy findings use the operator-path scenario: the operator following the documented path encounters X because the claim is false.
+
+Also record:
+- What belongs in the landing page vs deep reference vs runbooks
 - What is still unknown and must be labeled as a limitation
+- User-provided operating facts (deployment venue, ownership, support path) in `operating_facts[]` with `timestamp` **and** `last_verified` — never present those as code-derived truth
+- **Known limitations** synthesized from profile `deferred[]` + `hot_spots[]` + `pass_debt[]` + untested `invariants[]` (skip this section on a standalone docs run with no prior ledgers). Do not invent mitigations.
 
 ### 3. Plan Top Down, Write Bottom Up
 
@@ -247,6 +252,7 @@ If the repo is public and deeper internal runbooks cannot live in the repository
 
 ---
 > **Scope note.**
+> **Known limitations.** (from prior qc ledgers when they exist; otherwise omit)
 ```
 
 ### README Rules
@@ -339,6 +345,7 @@ Must answer:
 - What files are critical?
 - What is fragile or unfinished?
 - What should the next maintainer check first?
+- What is the first-day path and the first-incident path the code actually supports?
 
 Recommended sections:
 - Purpose and Scope
@@ -347,6 +354,7 @@ Recommended sections:
 - First-Day Commands
 - Critical Files and Directories
 - Known Risks and Sharp Edges
+- Known limitations (from prior qc-hardening / qc-coherence ledgers — skip if none)
 - Immediate Next Steps
 
 ### `API.md`
@@ -417,21 +425,24 @@ Documentation updates should ship with the code changes that require them. If a 
 
 ## Documentation Quality Gates
 
-A production-docs pass is only complete when all three gates pass.
+A production-docs pass is only complete when all four gates pass.
 
 ### Gate 1: Completeness
 
 Treat completeness as a coverage problem, not a writing-style judgment.
 
+Completeness is **dual**: (1) the required docs exist; (2) every operator-relevant surface the *code* exposes is documented when it is relevant to the archetype.
+
 Pass conditions:
 - The repo archetype has been identified and the required document set for that archetype exists.
 - Every critical concern has a canonical home: entry points, commands, configuration, environment variables, interfaces, outputs, state files, deployment path, operating procedures, failure modes, and ownership.
+- Every inventoried code-surfaced concern (health endpoint, recovery path, config key, error mode, scheduler, public CLI flag) has a documented home, or is explicitly out of scope for the archetype.
 - The README points to the deeper docs instead of silently omitting required operational material.
 - No required doc remains as a placeholder or empty shell.
 
 Fail conditions:
 - A required doc for the repo archetype is missing.
-- A critical concern exists in the codebase but has no documented home.
+- A critical concern exists in the codebase but has no documented home. **Absence of coverage for a code-surfaced concern is a Completeness finding.**
 - Important operational facts exist only in scattered notes, code comments, or chat history.
 - The README implies a complete story while deeper required docs do not exist.
 
@@ -455,8 +466,11 @@ Fail conditions:
 - A documented command, flag, endpoint, env var, or output path does not exist.
 - Operational claims are invented, overstated, or copied from generic guidance without repo evidence.
 - User-supplied operating facts are presented as code-derived truth when they are not encoded in the repository.
+- A non-trivial ARCHITECTURE / OPERATIONS / API / DATA_MODEL claim has no `truth_map[]` row.
 
 Required evidence:
+- The profile `truth_map[]` (every non-trivial claim in those four docs → `file:line`, test name, or `user-provided:<id>`). Absence of the map fails this gate.
+- P1+ accuracy findings state the operator-path scenario: following the documented path encounters X because the claim is false.
 - A verification log, lightweight or formal, showing which commands, interfaces, config paths, and outputs were checked.
 - `Last verified against` headers on deeper operational docs when those docs are created or substantially rewritten.
 
@@ -481,12 +495,31 @@ Required evidence:
 - A readability check that confirms the landing page still works as a five-minute orientation path.
 - A contradiction and duplication sweep across the canonical docs.
 
+### Gate 4: Handoff Readiness
+
+Treat handoff as a human-outcome problem. Files that exist and are accurate can still leave a new person stuck.
+
+Pass conditions:
+- A competent new engineer or operator can perform the archetype's **first-day path** (install/run or deploy+health) using only the doc set.
+- They can perform the archetype's **first-incident path** (the most likely failure the code actually supports — missing config, bad input, downstream timeout) using TROUBLESHOOTING.md / OPERATIONS.md, without tribal knowledge.
+- Both paths are strictly limited to what the code supports. Do not invent recovery procedures.
+
+Fail conditions:
+- First-day or first-incident steps require knowledge that exists in code or prior qc ledgers but not in HANDOFF.md, TROUBLESHOOTING.md, or the README.
+- HANDOFF.md is missing when the repo is changing hands or `qc-all` is running a full suite (HANDOFF is then in-scope even if the archetype table would skip it for a library).
+- Known limitations from prior hardening/coherence runs (profile `deferred[]`, `hot_spots[]`, untested `invariants[]`) are missing from HANDOFF.md, TROUBLESHOOTING.md, and the README scope note when those ledgers exist.
+
+Required evidence:
+- Named first-day and first-incident paths, each with doc pointers.
+- A **Known limitations** heading (or an explicit skip because no prior ledgers exist).
+
 ### Done Definition
 
 The pass is done only when:
 - Completeness is green.
 - Accuracy is green.
 - Clarity is green.
+- Handoff Readiness is green.
 
 If any gate is red, the documentation pass is not complete even if the prose is polished.
 
@@ -494,7 +527,7 @@ If any gate is red, the documentation pass is not complete even if the prose is 
 
 Multiple passes may be needed if the first pass introduces new content that itself contains errors (e.g., a new API.md section with a wrong import). Each pass should find fewer and lower-severity issues than the previous one.
 
-**Stop when:** All three gates pass and the current pass found only P3 issues (stale counts, minor wording, cosmetic separators) or no issues at all. Do not run additional passes for style preferences.
+**Stop when:** All four gates pass and the current pass found only P3 issues (stale counts, minor wording, cosmetic separators) or no issues at all. Do not run additional passes for style preferences.
 
 **Warning sign:** If a pass finds new P1/P2 issues that the previous pass should have caught, the verification process has a gap. Investigate why the validation matrix missed it before continuing — the issue may indicate a systematic blind spot (e.g., non-markdown assets, blanket claims about code organization) rather than a one-off miss.
 
@@ -557,13 +590,11 @@ These issues survive multiple manual passes because they require simultaneously 
 
 ## Findings Output Contract
 
-After each documentation pass, write findings to `.qc-findings/qc-docs.json` in the project root. The file must conform to schema [`references/qc-finding.schema.json`](references/qc-finding.schema.json).
-
-**Example finding:**
+qc-core ledger at `.qc-findings/qc-docs.json`. P1+ accuracy contradictions need the operator-path scenario triple (`operator following the documented path encounters X because the claim is false`). Unknown operating facts defer as `user-provided-unknown`. Verify: `python3 ../qc-core/scripts/verify_ledger.py .qc-findings/qc-docs.json`.
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "skill": "qc-docs",
   "run_id": "2026-05-17T14:30:00Z-abc1234",
   "git_sha": "abc1234",
@@ -571,28 +602,24 @@ After each documentation pass, write findings to `.qc-findings/qc-docs.json` in 
     {
       "id": "D2.1",
       "severity": "P2",
+      "confidence": "pattern",
       "file": "README.md",
       "line": 1,
       "what": "README does not document the canonical run command, but CLI help shows one",
       "fix": "Add a Quickstart section quoting the working `python -m claims_agent --help` invocation",
       "fixed": false,
-      "deferred_because": "Pending product naming decision"
+      "deferred_because": "needs-owner: product naming decision"
     }
   ],
   "verdict": "READY_WITH_DEBT"
 }
 ```
 
-**Verdict mapping:**
-
-| Skill outcome | Rollup verdict |
-|:---|:---|
-| Zero findings | `READY` |
-| Only P2/P3 findings, all fixed or `deferred_because` set | `READY_WITH_DEBT` |
-| Any P0/P1 with `fixed: false` and no `deferred_because` | `NOT_READY` |
+Verdict math is qc-core (open P0 policy for this skill). Persist `truth_map[]` and `operating_facts[]` on `.qc-profile.json`.
 
 ## Relationship to Other Skills
 
-- Use `production-packaging` when the repo needs packaging, release polish, and repository hygiene beyond documentation
-- Use `production-hardening` when the code needs defect reduction and production-risk reduction
-- Use `production-docs` when the primary goal is documentation structure, clarity, handoff quality, and operational standardization
+- `qc-packaging` — packaging, release polish, repository hygiene
+- `qc-hardening` — defect reduction (runs before docs in the suite)
+- `qc-coherence` — cross-cutting consistency (runs before docs in the suite)
+- `qc-docs` — documentation structure, accuracy, handoff, operational standardization

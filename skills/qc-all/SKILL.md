@@ -1,11 +1,13 @@
 ---
 name: qc-all
-description: Run the full quality control suite in the correct order — packaging, docs, hardening, structural integrity. Use before releases, after major feature cycles, or when you want a comprehensive quality gate. Triggers include "qc-all", "full QC", "run all quality checks", "release readiness", "quality gate".
+description: Run the full quality control suite in the correct order — packaging, hardening, coherence, docs. Use before releases, after major feature cycles, or when you want a comprehensive quality gate. Triggers include "qc-all", "full QC", "run all quality checks", "release readiness", "quality gate".
 ---
 
 # QC-All — Full Quality Control Suite
 
-Router that invokes four sub-skills, applies watch-manifest skip logic, and emits a structured `_rollup.json` with full provenance.
+**REQUIRED:** Load `qc-core` first. Suite order, verdict algebra, profile, and ledger contract live there. This skill is the router: skip logic, watch manifest, history, supervisor dispatch.
+
+Legal order (do not reorder): **qc-packaging → qc-hardening → qc-coherence → qc-docs**. Mechanical-then-deep happens inside hardening. Docs run last so they match the code that survived.
 
 ## When to Use
 
@@ -16,82 +18,59 @@ Router that invokes four sub-skills, applies watch-manifest skip logic, and emit
 
 ## Execution Flow
 
-**Pre-flight:**
-1. Read `qc-all/references/qc-watch-manifest.json` (glob lists per skill).
-2. Determine last-run SHA: if `.qc-history.jsonl` exists, read its last line and extract `git_sha` as `last_sha`. Otherwise `last_sha = null`.
-3. If `last_sha` is non-null, compute `changed_files = git diff --name-only $last_sha..HEAD`.
+**Pre-flight:** Load qc-core and `.qc-profile.json`. Read `references/qc-watch-manifest.json`. Last-run SHA = last line of `.qc-history.jsonl` → `git_sha`, else null. If last SHA is set, compute `changed_files` and the hardening/coherence **reexam set**:
 
-**Per-skill loop** — for each skill in `[qc-packaging, qc-docs, qc-hardening, qc-coherence]`:
-- Apply **Skip Decision** (see below).
-- If running: invoke `/qc-<skill>`, then read `.qc-findings/<skill>.json`.
-- If skipped: record `{skill, last_covered_sha: last_sha}` in the skipped list.
+```
+python3 ../qc-core/scripts/partition.py --reexam --since $last_sha --profile .qc-profile.json --json
+```
 
-**Aggregate:** Follow `references/rollup.md` to compute verdict and compose `_rollup.json`.
+**Per-skill loop** — for each skill in `[qc-packaging, qc-hardening, qc-coherence, qc-docs]`:
+- Apply **Skip Decision** (below).
+- If running: invoke `/qc-<skill>` with **prior-skill ledgers as mandatory input** (hardening ledger → coherence `priorState`; hardening + coherence → docs). Pass the reexam set as scope for hardening and coherence. Then read `.qc-findings/<skill>.json`.
+- If skipped: record `{skill, last_covered_sha: last_sha}`.
 
-**Persist:** Write `.qc-findings/_rollup.json`; append one line to `.qc-history.jsonl` (TODO: bounded trim — ticket 582c2d8b).
+**Aggregate:** `python3 ../qc-core/scripts/suite_rollup.py --findings-dir .qc-findings` (algebra: [qc-core verdict](../qc-core/references/verdict.md)).
+
+**Persist:** `_rollup.json` is current state. `python3 references/scripts/append_history.py .qc-findings/_rollup.json` appends one line to `.qc-history.jsonl` (20-line trim).
 
 ## Skip Decision
 
 ```
-1. If .qc-history.jsonl does not exist → run ALL sub-skills (no skip).
-2. last_sha = last line of .qc-history.jsonl → .git_sha
-3. current_sha = git rev-parse HEAD
-4. If last_sha == current_sha → skip ALL sub-skills (last_covered_sha = last_sha).
-5. Otherwise: changed_files = git diff --name-only $last_sha..HEAD
-6. For each sub-skill:
-     manifest_globs = qc-watch-manifest.json[skill]   # e.g. ["**/*.py", "tests/**/*"]
-     if any glob in manifest_globs matches any file in changed_files → run skill
-     else → mark skipped with last_covered_sha = last_sha
+1. No .qc-history.jsonl → run ALL skills.
+2. last_sha = last history line .git_sha; current_sha = git rev-parse HEAD
+3. last_sha == current_sha → skip ALL (last_covered_sha = last_sha)
+4. Else changed_files = git diff --name-only $last_sha..HEAD
+5. Per skill: if any watch-manifest glob matches a changed file → run; else skip
 ```
-
-Read `.qc-history.jsonl[-1].git_sha` to inspect the last covered SHA at any time.
 
 ## Output Contract
 
-Write `.qc-findings/_rollup.json`. Schema: `qc-all/references/qc-finding.schema.json`.
+Write `.qc-findings/_rollup.json`. Schema: `../qc-core/references/qc-finding.schema.json`. `findings` is always empty in the rollup; provenance is `run_id`, `git_sha`, `skipped`, `findings_by_skill`, `skill_verdicts`.
 
-The `findings` array is always empty in the rollup — raw findings live in the per-skill files. Provenance is carried by `run_id`, `git_sha`, `skipped`, and `findings_by_skill`.
-
-**Run ID format:** `<YYYY-MM-DD>T<HH:MM:SS>Z-<7-char-sha>`  
-Pattern: `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z-[0-9a-f]{7}$`
-
-**Example `_rollup.json`:**
+Run ID: `<YYYY-MM-DD>T<HH:MM:SS>Z-<7-char-sha>`.
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "skill": "qc-all",
   "run_id": "2026-05-17T14:30:00Z-abc1234",
   "git_sha": "abc1234567890",
   "findings": [],
   "verdict": "READY_WITH_DEBT",
   "skipped": [
-    {"skill": "qc-packaging", "last_covered_sha": "abc1234"},
-    {"skill": "qc-docs",      "last_covered_sha": "9876543"}
+    {"skill": "qc-packaging", "last_covered_sha": "abc1234"}
   ],
   "findings_by_skill": {
     "qc-hardening": {"P0": 0, "P1": 0, "P2": 3, "P3": 1},
     "qc-coherence": {"P0": 0, "P1": 1, "P2": 0, "P3": 0}
+  },
+  "skill_verdicts": {
+    "qc-hardening": "READY_WITH_DEBT",
+    "qc-coherence": "READY_WITH_DEBT"
   }
 }
 ```
 
-## Verdict Rules
+Any skill `NOT_READY`, or any P0 anywhere (fixed or not), → suite `NOT_READY`. Else any `READY_WITH_DEBT` or deferred P1 → `READY_WITH_DEBT`. Else `READY`.
 
-Computed deterministically from the aggregated findings per `references/rollup.md`: `NOT_READY` if any P0 or any open P1 (unfixed, no `deferred_because`); `READY_WITH_DEBT` if zero P0 and all P1s are fixed or deferred; `READY` if zero P0, zero P1, and all P2/P3 clean or deferred.
-
-## Supervisor Dispatch
-
-See `references/supervisor-dispatch.md` for payload structure, per-finding-type actions, and agent path note.
-
-## Persistence
-
-Writes `.qc-findings/_rollup.json` (overwrite each run — represents current state, not history). Appends one JSON line to `.qc-history.jsonl` containing at minimum `{run_id, git_sha, verdict, skipped}`. Ring-buffer trim behavior (bounded history) is defined in ticket 582c2d8b.
-
-After writing `.qc-findings/_rollup.json`, invoke the copy of `references/scripts/append_history.py` that ships with this skill:
-
-```bash
-python3 "$SKILL_DIR/references/scripts/append_history.py" .qc-findings/_rollup.json
-```
-
-`$SKILL_DIR` is the directory that contains this `SKILL.md`. The JSON path is relative to the *target repository* root. The script appends to `.qc-history.jsonl` with automatic 20-line trim.
+Supervisor dispatch: [references/supervisor-dispatch.md](references/supervisor-dispatch.md).

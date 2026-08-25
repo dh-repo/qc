@@ -44,11 +44,19 @@ Cell statuses:
 
 For every non-YES cell: file a finding with severity based on status.
 
-### Behavioral Verification
+### Behavioral Verification (first-class)
 
-For every interface with 2+ implementations: verify parameterized conformance test exists covering ALL implementations. If an implementation was added but not included in the test parameter list → P1 finding.
+Method presence and signatures are necessary but not sufficient. For every interface with 2+ implementations, the same inputs must be **observably equivalent** across implementations:
 
-If no conformance test exists → P1 finding. Generate test skeleton as remediation artifact.
+- serialization shapes and optional fields
+- error types
+- side-effect behavior (what is persisted, what is logged)
+
+Missing parameterized **behavioral** coverage is a finding (P1 if production backends can diverge at runtime). Scenario shape: `under input sequence X, backend A returns Y while B returns Z / a different exception`.
+
+This is the static/contract view. Hardening Carmack sequences and Chaos tests remain the runtime proof — do not duplicate those tests here; require that they exist and cover all implementations.
+
+Also verify a parameterized conformance test exists covering ALL implementations. If an implementation was added but not included in the test parameter list → P1. If no conformance test exists → P1. Generate a test skeleton as a remediation artifact.
 
 ### Drift Guard
 

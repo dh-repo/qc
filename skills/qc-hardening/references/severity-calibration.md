@@ -7,7 +7,7 @@
 | **P2 — Weakness** | Edge-condition issues, harder debugging, best-practice violation with concrete risk | Fix if low-risk. Note if complex. |
 | **P3 — Style/observation** | Style, minor inconsistency, or theoretical concern | Do not fix. Note only if systemic. |
 
-**The bar for filing a finding:** You must describe a concrete scenario where the issue causes a real problem. "This could theoretically..." is not a finding.
+**The bar for filing a finding:** qc-core. Deep findings and any P1+ judgment finding carry `scenario.{trigger, violated_invariant, observable}`. "This could theoretically..." is not a finding. Mechanical tool hits stay lightweight (`confidence: mechanical`).
 
 **Severity calibration across passes:** Not all P1s are equal. A P1 from Carmack (invariant violation proven by reasoning) or Chaos (crash reproduced by test) is higher confidence than a P1 from a mechanical pass (pattern-matched but not tested). When prioritizing fixes:
 - Carmack/Chaos P1 > Mechanical P1 (proven vs. pattern-matched)

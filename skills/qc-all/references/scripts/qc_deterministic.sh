@@ -63,37 +63,28 @@ detect_tool() {
   return 1
 }
 
+CORE_VERIFY="$(cd "$SCRIPT_DIR/../../../qc-core/scripts" && pwd)/verify_ledger.py"
+
 emit_finding() {
   local id="$1" severity="$2" file="$3" what="$4"
   local item
   item=$(jq -n \
     --arg id "$id" --arg severity "$severity" \
     --arg file "$file" --arg what "$what" \
-    '{id:$id,severity:$severity,file:$file,what:$what,fixed:false}')
+    '{id:$id,severity:$severity,file:$file,what:$what,fixed:false,confidence:"mechanical"}')
   FINDINGS_ARRAY=$(printf '%s' "$FINDINGS_ARRAY" | jq ". + [$item]")
 }
 
-compute_verdict() {
-  local p0 open_p1 total
-  p0=$(printf '%s' "$FINDINGS_ARRAY" | jq '[.[]|select(.severity=="P0")]|length')
-  open_p1=$(printf '%s' "$FINDINGS_ARRAY" | jq \
-    '[.[]|select(.severity=="P1" and .fixed==false and ((.deferred_because//"")==""))]|length')
-  if [[ "$p0" -gt 0 ]] || [[ "$open_p1" -gt 0 ]]; then
-    printf 'NOT_READY'; return
-  fi
-  total=$(printf '%s' "$FINDINGS_ARRAY" | jq 'length')
-  if [[ "$total" -gt 0 ]]; then
-    printf 'READY_WITH_DEBT'; return
-  fi
-  printf 'READY'
+compute_verdict_via_core() {
+  printf '%s' "$FINDINGS_ARRAY" | python3 "$CORE_VERIFY" --verdict
 }
 
 finalize_json() {
   local verdict
-  verdict=$(compute_verdict)
+  verdict=$(compute_verdict_via_core)
   mkdir -p "$FINDINGS_DIR"
   jq -n \
-    --arg schema_version "1.0" \
+    --arg schema_version "1.1" \
     --arg skill "qc-deterministic" \
     --arg run_id "$RUN_ID" \
     --arg git_sha "$GIT_SHA" \
@@ -284,7 +275,7 @@ run_checks() {
     exit 2
   fi
   local verdict
-  verdict=$(compute_verdict)
+  verdict=$(compute_verdict_via_core)
   [[ "$verdict" == "NOT_READY" ]] && exit 1
   exit 0
 }

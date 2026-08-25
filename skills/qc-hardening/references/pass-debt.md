@@ -1,16 +1,26 @@
 ## Findings Ledger
 
-**Write findings to the ledger.** After each pass (1-14), fold findings into `.qc-findings/qc-hardening.json` in the project root — a single schema'd object rewritten atomically (temp file + `rename()`), never an in-place append, so a concurrent reader never sees a partial write (full contract in SKILL.md → Output Contract). This file is read by Pass 12 (Carmack) for multi-order effect analysis, by Pass 13 (Chaos) to target adjacent code, and by Pass 14 to ground the maintainability hot-spot assessment in actual evidence rather than taste.
+Ledger contract, atomic write, scenario triple, CLEAN lists: **qc-core**. Path remains `.qc-findings/qc-hardening.json`. Passes 12–14 read it for multi-order analysis. Interrupted runs leave the last complete object.
 
-**Lifecycle:** created at pass 1, accumulated through every pass 1-14 (atomic full-object rewrite); passes 12-14 read the prior findings as analysis input *and* append their own (Carmack `F12.x`, Chaos `F13.x`, Maintainability `F14.x`); the final state is committed as the run's output artifact. If the run is interrupted, the JSON file survives and can be loaded by the next run. Useful findings graduate to `.hardening-profile.md` Hot Spots section (persistent). Add `.qc-findings/qc-hardening.json` to `.gitignore` if the project does not want to version-control transient run artifacts; commit it if inter-run continuity is needed.
+Useful findings graduate to `.qc-profile.json` `hot_spots[]` (persistent). Add `.qc-findings/` to `.gitignore` if the project does not want to version-control transient run artifacts.
 
 ## Cross-Pass Feedback
 
-**When a deep pass (12, 13) finds a bug that an earlier mechanical pass should have caught**, add a row to the **Pass Debt** table in `.hardening-profile.md`. Record: which finding, which pass found it, which pass should have caught it, which module, and a one-line "why it was missed." On future runs, each mechanical pass checks the Pass Debt table for modules where it owes extra attention.
+**When a deep pass (12, 13) finds a bug that an earlier mechanical pass should have caught**, append a `pass_debt[]` row on `.qc-profile.json`. This is a first-class product, not a note.
+
+Required fields: `finding_id`, `found_by`, `should_have_been`, `module`, `why_missed`.
+
+`why_missed` must name the **combination** the mechanical pass did not look for (e.g. "Pass 1 checked each ingest function, not Excel-then-Parquet together"). Empty or "looked fine" is invalid — `verify_profile.py` rejects it. Do not use pass-debt to propose architecture.
+
+On the next run, the named mechanical pass treats listed modules as **mandatory extra attention**, not optional. Neighbors of recent diffs that appear here are composition re-examination (see scaling). Use pass debt to deepen that pass.
 
 ## Hardening Profile
 
-After the summary report, write or update `.hardening-profile.md` in the project root. This file persists across runs and enables the skill to learn.
+`.qc-profile.json` is the source of truth (qc-core). Render `.qc-profile.md` for humans. If `.hardening-profile.md` exists and the JSON does not, copy hot spots / pass debt / Carmack status into the JSON on the first upgraded run, then stop treating the markdown as authoritative.
+
+JSON sections this skill writes: `examination.qc-hardening`, `pass_streaks.qc-hardening`, `hot_spots`, `pass_debt`, `deferred`, `invariants`, `run_history`, `maintainability_trend`. Schema and field meanings: qc-core `references/profile.md`.
+
+Human-readable shape of those sections (for the generated markdown):
 
 ```markdown
 # Hardening Profile
@@ -63,9 +73,9 @@ specifically for that module during the debted pass.
 | ... | ... | ... |
 ```
 
-**Commit the profile** alongside the summary commit. Add `.hardening-profile.md` to version control — it's project metadata, not ephemeral state.
+**Commit `.qc-profile.json`** (and the generated `.qc-profile.md`) alongside the summary commit.
 
-**Incremental profile updates:** Do not wait until all 14 passes are complete to write the profile. Update `.hardening-profile.md` incrementally:
+**Incremental profile updates:** Do not wait until all 14 passes are complete. Update `.qc-profile.json` incrementally:
 - After Pre-Flight: write the Run History row (with "in progress" status) and initialize the Carmack Audit Manifest from the prior run's data
 - After each pass that produces findings: update the Hot Spots and Pass Debt sections
 - After Pass 12 (Carmack): update the Carmack Audit Manifest with EXAMINED/FINDING status
@@ -87,9 +97,9 @@ git revert <commit-hash>
 
 Idempotent. On a second run, previously committed fixes won't be re-applied. New code gets the full treatment. The summary reflects only the current run.
 
-**On re-runs, the hardening profile makes the skill smarter:**
-- Load `.hardening-profile.md` in pre-flight (step 2b)
+**On re-runs, the profile makes the skill smarter:**
+- Load `.qc-profile.json` in pre-flight
 - Passes eligible for quick-check run tool-only, skip manual audit
-- Carmack audit manifest carries forward — only deeply read NEW or CHANGED modules plus any still marked NOT YET
+- Examination status carries forward — only deeply read NEW or CHANGED modules plus any still marked `NOT_YET`
 - Hot spots get extra attention — if `ingest.py` produced findings in 3 prior runs, read it first
 - Update the profile at the end with this run's results

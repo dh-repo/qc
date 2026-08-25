@@ -6,25 +6,27 @@ Read the code the way John Carmack would. No tools, no checklists — just deep 
 
 **How to execute:**
 
-**Step 0: Run coverage and build the audit manifest.** Before reading any code, run the coverage tool and produce a per-module table:
+**Step 0: Run coverage and build the audit manifest.** Before reading any code, run the coverage tool and produce a per-module table. Write it to profile `examination.qc-hardening` (this **is** the Carmack manifest; Pass 1 CLEAN stays on the ledger `examined[]`).
 
 ```
-| Module | LOC | Coverage | Untested Lines | Carmack Status |
-|--------|-----|----------|----------------|----------------|
-| parser.py | 534 | 91% | 261-263, 419-431 | NOT YET |
-| grouper.py | 616 | 92% | 197-234 | NOT YET |
-| ... | ... | ... | ... | ... |
+| Module | LOC | Coverage | Untested Lines | Live I/O / adapter | Carmack Status |
+|--------|-----|----------|----------------|--------------------|----------------|
+| parser.py | 534 | 91% | 261-263, 419-431 | no | NOT YET |
+| ingest.py | 410 | 70% | 12-40 | excel + parquet readers | NOT YET |
+| ... | ... | ... | ... | ... | ... |
 ```
 
-This manifest tracks what you've actually read. Update the "Carmack Status" column as you go (NOT YET → EXAMINED → FINDING). At the end of the pass, every module must be EXAMINED or FINDING. If any say NOT YET, the pass is incomplete.
+Update status as you go (`NOT_YET` → `EXAMINED` → `FINDING`). At the end, every module must be `EXAMINED` or `FINDING`. If any say `NOT_YET`, the pass is incomplete.
 
-**Priority order:** Read untested lines FIRST. Code that has never executed is code that has never been proven correct by anything. The Carmack pass may be the only thing that ever looks at it.
+**`EXAMINED` is hard to fake.** A one-sentence invariant is not enough. Each `EXAMINED` module requires either answers to the five questions or `{invariant, assumptions, sequence_risk}` — all substantive. `verify_profile.py` rejects the rest.
+
+**Priority order:** untested **live external and adapter paths first**, then other untested lines, then the rest. Code that has never executed is code that has never been proven correct. Live I/O is where residual production defects hide after mechanical noise is gone.
 
 **Step 0b: Read the findings ledger.** Passes 1-11 write their findings to `.qc-findings/qc-hardening.json` as they execute. Before deep reading any code, read this file. It contains every finding, its location, severity, and fix from the mechanical passes. **If `.qc-findings/qc-hardening.json` is absent (a first run, or a single deep pass invoked standalone), proceed with no prior-findings input — seed the multi-order analysis from this pass's own reading.** Use it as input to your analysis:
 
-- **First-order effects:** For each finding, ask "does the same pattern exist elsewhere?" A boundary coercion bug in CSV reading likely exists in Excel and Parquet reading too. A missing null check in one orchestrator likely exists in the other.
+- **First-order effects:** For each finding, ask in those words: **"same pattern in other backends / dual paths?"** A boundary coercion bug in CSV reading likely exists in Excel and Parquet reading too. A missing null check in one orchestrator likely exists in the other.
 - **Second-order effects:** For each fix applied in earlier passes, ask "did the fix introduce a new assumption?" A type coercion fix assumes the input is one of a known set of types — what if it isn't?
-- **Third-order effects:** Look for *patterns* across findings. Three findings in the same module about the same category (boundary coercion, missing validation, implicit contracts) suggest a missing abstraction or a systemic design gap — not just three individual bugs.
+- **Third-order effects:** Look for *patterns* across findings. Three findings in the same module about the same category (boundary coercion, missing validation, implicit contracts) suggest a missing abstraction or a systemic design gap — not just three individual bugs. Harvest each finding's `violated_invariant` into profile `invariants[]` (`source: carmack`). Do not invent invariants that were not observed.
 
 Report systemic patterns as findings. "Three boundary coercion bugs in ingest.py suggest all external I/O should pass through a single sanitization layer" is a valid Carmack finding if you can show the concrete risk of the current scattered approach.
 
@@ -50,7 +52,9 @@ Report systemic patterns as findings. "Three boundary coercion bugs in ingest.py
 
 **Cross-backend check (mandatory here when alternative backend implementations exist):** after any fix, grep the other backend(s) for the same pattern and fix all instances in the same commit — see "Cross-Backend Awareness" in [passes-1-11.md](passes-1-11.md).
 
-**Finding format:** Same as all other passes (ID, Location, What, Why, Severity, Fix). But the "Why" field for Carmack findings should describe the specific scenario or sequence, not just "could cause issues."
+**Finding format:** qc-core full evidence plus the structured scenario triple (`trigger`, `violated_invariant`, `observable`). `trigger` names a **combination** (second step, second impl, second location, or dual path) — not "this function is wrong." Carmack's five questions map onto that triple (Q1 → invariant, Q2/Q3 → trigger, Q4/Q5 → observable). "Could cause issues" is not a finding.
+
+**Escalation loop (every finding):** grep the pattern → fix all instances in one commit → if a mechanical pass should have caught the combination, write `pass_debt[]`.
 
 **What this pass does NOT do:**
 - Style, formatting, naming (those are P3s, not findings)
@@ -80,7 +84,7 @@ and state transition:
 
 [FULL TEXT of modules in this group]
 
-## Untested lines (from coverage report — read these FIRST)
+## Untested lines (from coverage report — live I/O / adapter paths FIRST, then the rest)
 
 [List of file:line ranges with 0% coverage in this module group.
 These lines have NEVER executed. They are the highest-priority
@@ -95,7 +99,7 @@ subagent can reason about cross-module contracts]
 
 [Contents of .qc-findings/qc-hardening.json — the ledger of all findings from
 mechanical passes. For each finding in modules you're reviewing:
-- First-order: does the same pattern exist elsewhere in YOUR modules?
+- First-order: same pattern in other backends / dual paths?
 - Second-order: did the fix introduce a new assumption?
 - Third-order: do multiple findings in the same module suggest a systemic gap?]
 
@@ -108,35 +112,36 @@ mechanical passes. For each finding in modules you're reviewing:
 - Do not report style, naming, or hypothetical concerns.
 - Do not duplicate findings from passes 1-11 (assume those ran already).
 - If you see a potential cross-module issue (this module assumes something
-  about another module's behavior), flag it as "CROSS-MODULE CONCERN"
-  with the specific assumption and which module it depends on.
+  about another module's behavior), file it as a FINDING with the same six
+  fields and a combination-shaped trigger. Do not use a second-class
+  "concern" list.
 
 Report format:
-- FINDINGS: [list of findings with all 6 fields]
-- CROSS-MODULE CONCERNS: [list with assumption + dependent module]
-- CLEAN: [list of functions/areas examined with no findings]
+- FINDINGS: [list of findings with all 6 fields; cross-module included]
+- CLEAN: named artifacts, each with the five Carmack questions answered at module granularity (boilerplate "looks fine" is incomplete)
 ```
 
 **Coordinator responsibilities after subagent reports:**
-1. Collect all FINDINGS — these are confirmed single-module issues, fix them
-2. Collect all CROSS-MODULE CONCERNS — verify each by reading both modules. Promote to full findings (with F-ID, severity, evidence) if confirmed; discard if the assumption is actually enforced. Do NOT leave confirmed cross-module issues as untracked "concerns."
-3. Track which modules and functions were examined in the CLEAN lists — if a module group has no CLEAN list, the subagent may have skimmed. Re-dispatch.
-4. After all groups reviewed: look for systemic patterns across groups (e.g., "three modules all assume X but none enforce it")
+1. Collect all FINDINGS (including cross-module). Combination-shaped triggers stay first-class — same F-ID, severity, scenario.
+2. Verify any finding that spans a group boundary by reading both sides. Discard only if the assumption is actually enforced. Never leave a confirmed combination as an untracked "concern."
+3. Track CLEAN lists — if a module group has none, the subagent may have skimmed. Re-dispatch.
+4. After all groups reviewed: look for systemic patterns across groups; harvest `violated_invariant` into `invariants[]`; write `pass_debt[]` for missed combinations.
 
 ### Re-running the Carmack pass
 
 This pass is designed to be run multiple times. Each run should:
 1. Re-run coverage to get fresh untested lines (prior runs may have added tests)
 2. Update the audit manifest — carry forward EXAMINED/FINDING status from prior runs
-3. Target modules still marked NOT YET, plus untested lines in EXAMINED modules
+3. Target modules still marked NOT YET, untested lines in EXAMINED modules, and import-graph neighbors of changed files that sit in hot_spots/pass_debt
 4. Question fixes from prior runs ("did the fix introduce a new assumption?")
 
 Three runs is typical. If run 3 is clean across all modules, the codebase is well-hardened.
 
 **Completion criteria:** The pass is complete when:
 - Every module row in the audit manifest is EXAMINED or FINDING
-- Every untested line range has been explicitly reasoned about (even if no finding)
-- The "CLEAN" list in the output names every function that was examined without findings
+- Every EXAMINED row has five-question answers or `{invariant, assumptions, sequence_risk}`
+- Every untested line range — live I/O first — has been explicitly reasoned about (even if no finding)
+- Harvested `invariants[]` rows exist for each Carmack finding's `violated_invariant`
 
 If you can't state what you examined in a module, you didn't examine it.
 
@@ -148,7 +153,7 @@ The Carmack pass reads code and reasons about it. This pass *runs* the code with
 
 **Core principle:** Generate inputs designed to break invariants, corrupt state, or trigger unhandled edge cases — then feed them through the real pipeline and verify the system degrades gracefully. Every crash, hang, or silent data corruption is a finding.
 
-**This pass writes tests only.** It does not change production code. Findings from this pass are reported the same as all other passes (ID, Location, What, Why, Severity, Fix) but the fix is typically "add input validation" or "handle this edge case," implemented in a subsequent commit.
+**This pass writes tests only.** It does not change production code. Each production-shaped test is an explicit **hypothesis** ("this sequence must not crash or corrupt"). Blast radius is the test file — never production, never Game Days. Findings use the structured scenario triple; `trigger` names the combination. The fix is typically "add input validation" or "handle this edge case," implemented in a subsequent commit. `tests/test_chaos.py` is **living production-shaped coverage** — every crash stays in the suite permanently.
 
 ### How to execute
 
@@ -193,6 +198,7 @@ class TestChaosMonkey<Module>:
 ### What this pass does NOT do
 
 - Change production code (chaos tests only)
+- Production failure injection, Game Days, or adaptive-capacity measurement
 - Test performance under load (Pass 6)
 - Test security/injection for exploitation (Pass 2)
 - Test correct output for valid inputs (Pass 1)
@@ -211,7 +217,8 @@ When a chaos test crashes:
 2. Keep the chaos test (it now documents the bug)
 3. **Before fixing: Carmack escalation.** Grep for the same pattern elsewhere in the codebase. If the crash was `.strip()` on a non-string, search for every `.strip()` call on user-provided data. If a `float` value crashed `int()`, search for every `int()` on external data. This takes 60 seconds and typically doubles the finding count. Write chaos tests for each additional instance found.
 4. Fix ALL instances (not just the one that crashed) in a single commit
-5. Verify all chaos tests pass after the fix
+5. If a mechanical pass should have caught the combination, write `pass_debt[]` (`why_missed` names it)
+6. Verify all chaos tests pass after the fix
 
 **The Carmack escalation is not optional.** Every crash is evidence of a pattern. A single instance is a bug; two instances are a systemic gap. The escalation grep is how you find out which one you're dealing with. If you skip it, you'll find the same class of bug on the next Chaos run.
 
@@ -255,9 +262,16 @@ def test_chaos_batch_hypothesis_any_rows(rows):
 
 **Do NOT add hypothesis to project dependencies.** Use it if already installed; otherwise, wrap in `pytest.importorskip("hypothesis")` so chaos tests run without it (just the hand-written ones).
 
-### Pipeline chain chaos
+### Production-shaped sequences (mandatory when the surface exists)
 
-Individual function chaos tests miss bugs that only appear when modules interact. Feed adversarial inputs at the pipeline entry point and verify the full chain survives.
+If the repo has a pipeline, orchestrator, or state machine, these cases are **required**, not extras. Assert no-crash / right exception / graceful degradation only — not output values for garbage.
+
+- **Wrong order of otherwise-valid steps** — call step 2 then step 1; call close then write; skip an intermediate step the happy path always runs.
+- **Partial success then failure** — first N items succeed, item N+1 raises; the batch must not corrupt committed state or double-apply the successes.
+- **Empty-then-large** — empty batch (or empty input) followed by a large valid batch; no stale counters, caches, or skip counts.
+- **Double-submit under the real state machine** — same `batch_id` / same transition fired twice; second call is idempotent or rejected, never a corrupt half-state.
+
+Individual function chaos tests miss bugs that only appear when modules interact. Also feed adversarial inputs at the pipeline entry point and verify the full chain survives:
 
 ```python
 def test_chaos_pipeline_garbage_through_full_chain(self):
@@ -381,6 +395,8 @@ This is the closing synthesis pass. It translates the evidence from passes 1-13 
 - **C** — Repeated drift, broad integration hubs, or weak contracts make normal changes riskier than they should be.
 - **D/F** — Routine modifications are unsafe without whole-system context, or the codebase has no stable internal contract.
 
+**Every sub-A grade (B–F) requires at least one concrete past or future change that would force whole-system context.** No grade without that sentence. "Feels messy" is not a grade. Letter grades are supporting evidence; the **release judgment** (release-ready / releasable-with-debt / not-yet) is the primary output of this pass.
+
 **14.4 Findings bar**
 
 - A maintainability finding must describe a concrete change-risk, reasoning burden, or drift risk.
@@ -401,6 +417,6 @@ This is the closing synthesis pass. It translates the evidence from passes 1-13 
 
 **14.7 Required output**
 
-- Assign three grades: `Consistency`, `Maintainability`, and `Overall`.
+- **Primary:** release judgment — release-ready as-is, releasable with deferred maintainability debt, or not yet releasable because maintainability risks are still concrete blockers.
+- Supporting: three grades (`Consistency`, `Maintainability`, `Overall`). Each sub-A grade names the concrete change that would force whole-system context.
 - Name the top hot spots with a one-line rationale for each.
-- State whether the codebase is release-ready as-is, releaseable with deferred maintainability debt, or not yet releaseable because maintainability risks are still concrete blockers.

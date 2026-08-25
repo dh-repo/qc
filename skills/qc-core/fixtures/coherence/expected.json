@@ -1,0 +1,20 @@
+{
+  "skill": "qc-coherence",
+  "must_find": [
+    {
+      "severity": "P2",
+      "what_contains": ["run_id", "execution_id"]
+    },
+    {
+      "file_substring": "stub.py",
+      "severity": "P1",
+      "what_contains": ["NotImplementedError", "persist", "stub"]
+    },
+    {
+      "file_substring": "stores.py",
+      "severity": "P1",
+      "what_contains": ["delete", "FileNotFoundError"]
+    }
+  ],
+  "must_mark_clean": ["app/clean.py"]
+}

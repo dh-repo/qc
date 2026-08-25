@@ -2,6 +2,8 @@
 
 These six checks run when `qc-coherence` is invoked with `--scope=module`. They audit whether individual modules and their protocol implementations still compose correctly — a targeted lens that complements the codebase-wide sub-audits.
 
+**Priority:** when 2+ backends exist, run **MS-4 immediately after MS-1**. If `.qc-profile.json` `pass_debt[]` or `hot_spots[]` already name adapter modules, MS-4 is not skippable. Ids stay MS-1…MS-6.
+
 Finding IDs use the `MS-N.N` prefix (Module Scope). Severity uses the P0–P3 scale:
 - **P0** — Actively broken; must fix before any feature work
 - **P1** — Will break under realistic conditions; fix before next session
@@ -44,10 +46,11 @@ MS-1.N | Protocol | Method | Implementations | Conformance test exists? | Gap
 **How to audit:**
 
 1. For each module over 500 LOC, list the distinct responsibilities it handles (by reading section comments, method groups, and table names it manages).
-2. For each module, count:
+2. For each module, count (measurable first half):
    - Number of database tables it owns
    - Number of distinct Protocol interfaces it serves
-   - Number of unrelated domain concepts (e.g., "run state" + "intelligence snapshots" + "pending events")
+   - Number of domain concepts (e.g., "run state" + "intelligence snapshots" + "pending events")
+   Write `clusters[]` with those symbols and a `rationale` for why they are unrelated (second half). Without the cluster artifact the finding is incomplete.
 3. Flag modules where a single lock serializes access to multiple unrelated tables.
 4. Check if the module's responsibilities have grown since the last audit.
 
@@ -83,7 +86,7 @@ MS-2.N | Module | LOC | Responsibilities | Tables | Recommendation
    - Which methods acquire it
    - Whether it's always acquired in the same order relative to other primitives
 3. Map the state machine: what are the valid states, what transitions between them, and which methods trigger each transition?
-4. Check for coordination patterns that have caused bugs before (from the hardening profile's pass debt table).
+4. Check for coordination patterns that have caused bugs before (from `.qc-profile.json` `pass_debt[]`).
 5. Count the number of distinct lock/gate/event interactions a developer must understand to safely modify the orchestration layer.
 
 **Threshold signals:**
@@ -134,7 +137,7 @@ MS-4.N | Protocol | Method/Feature | SQLite | FabricSQL | Gap
 
 **How to audit:**
 
-1. Read the hardening profile's pass debt table and hot spots.
+1. Read `.qc-profile.json` `pass_debt[]` and `hot_spots[]` (legacy `.hardening-profile.md` only if the JSON does not exist yet).
 2. For each pattern listed (e.g., "double-lock TOCTOU", "use-after-close", "missing rollback"), grep the current codebase for new instances of the same pattern.
 3. Check whether external changes (visible in git log) touched modules that are documented hot spots.
 4. For each new module added since the last audit, verify it follows the established patterns:
@@ -156,7 +159,7 @@ MS-5.N | Pattern | Where found | Prior hardening finding | Risk
 - **P1:** New code follows a slightly different convention than established code (but not a known-bad pattern).
 - **P3:** New code is consistent with established patterns and avoids known-bad patterns.
 
-**Fix guidance:** Fix reintroduced bad patterns immediately (they're proven bugs). For convention drift, add the finding to the hardening profile's pass debt table so the next hardening run catches it.
+**Fix guidance:** Fix reintroduced bad patterns immediately (they're proven bugs). For convention drift, add the finding to `.qc-profile.json` `pass_debt[]` so the next hardening run catches it.
 
 ---
 
@@ -189,7 +192,7 @@ MS-6.N | File/Pattern | LOC | Issue | Recommendation
 
 ## Accepted Debt Staleness
 
-Every accepted debt entry in `.structural-integrity.md` must include a `Last reviewed: YYYY-MM-DD` date. On each module-scope audit:
+Every accepted debt entry in `.qc-profile.json` `deferred[]` (legacy `.structural-integrity.md` on first upgraded run) must include a last-reviewed date. On each module-scope audit:
 
 1. Check the `Last reviewed` date on every accepted debt item.
 2. If an item has not been reviewed in 30+ days, flag it as **STALE** (P1).

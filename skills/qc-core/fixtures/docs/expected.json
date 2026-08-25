@@ -1,0 +1,11 @@
+{
+  "skill": "qc-docs",
+  "must_find": [
+    {
+      "file_substring": "README.md",
+      "severity": "P1",
+      "what_contains": ["--launch", "command"]
+    }
+  ],
+  "must_mark_clean": []
+}

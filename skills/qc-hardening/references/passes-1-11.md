@@ -1,10 +1,26 @@
 ## PASS 1: CORRECTNESS
 
-Logic errors in production are the most expensive defects.
+Logic errors in production are the most expensive defects. **Composition is the main lens.** Sequence-level correctness, dual-path API parity, complete field population, classification completeness, and I/O coercion on every ingest path are the checks that catch the defects Carmack later finds. Isolated pure-function bugs are the easy residual. A Pass 1 that only reads functions in isolation is incomplete.
 
 **1.1 Test suite gate** — Run the full suite. Fix failing code (not tests) unless the test is provably wrong. If fixing a test, add a comment explaining why the original assertion was incorrect.
 
-**1.2 Function-level audit** — Read every function and check:
+**Pass 1 is a deep-read pass.** Like Carmack (Pass 12), its quality degrades with context size. In chunked mode, dispatch per module group: audit manifest, CLEAN lists, untested-line priority, live I/O first. Profile hot spots and `pass_debt[]` modules for Pass 1 are mandatory extra attention, not optional.
+
+**1.2 Sequence-level audit (primary)** — For every pair of functions that touch the same file, shared state, or resource within a module:
+
+- **Write-then-read ordering:** If function A writes to a resource and function B reads it, verify B runs *after* A. If both can run in the same loop iteration, verify the ordering is enforced, not coincidental. Example: `_write_state()` before `_check_stop_signal()` on the same file — if write runs first, it can erase data that check needs to read.
+- **Read-modify-write atomicity:** If a function reads a file/dict, modifies it, and writes it back, check what happens if another function writes to the same target between the read and the write.
+- **Cleanup-on-all-paths:** If function A allocates a resource (temp file, lock, connection) and function B releases it, verify B runs on *every* exit path from A — including exceptions, early returns, and loop breaks.
+
+**1.3 Dual-path API parity (primary)** — For every pair of public functions that serve the same data through different paths (e.g., a normalize-only orchestrator and a full-pipeline orchestrator), verify they accept the same metadata parameters and populate the same output fields. A parameter or field present on one path but missing from the other is a P1 finding. Common misses: lineage identifiers (`batch_id`), metadata stamps (`carrier`, `source_file`), and output fields (`row_number`, `fix_hint`) that one code path populates and the other silently leaves as defaults.
+
+**1.4 Field population of every output type (primary)** — For every output dataclass, verify that every field is actually populated by every code path that constructs it. The check: if a field has a default of `None`, `""`, or `[]`, trace every constructor call site and confirm the field is set. A field that defaults to empty and is never set by any code path is either intentionally optional (documented as such) or a latent bug. Pay special attention to fields populated by helper functions — verify the helper is actually *called*, not just *defined*.
+
+**1.5 Classification completeness (primary)** — When code uses a set, enum, or mapping to classify items into categories (e.g., "which signals apply to which address types"), verify the classification is *complete*. For every item that *could* be in the set, confirm it either is or has an explicit reason not to be. Incomplete classification sets are invisible to function-level audits because the code that reads the set works correctly — the bug is in *what the set contains*, not in *how the set is used*.
+
+**1.6 I/O coercion on every ingest path (primary)** — At every boundary where external data enters the system (file readers, API responses, deserialization), trace the type of each value from the source format (CSV string, Excel cell, JSON field) through to its first use. Verify that type cleaning/coercion functions are called on *every* ingestion path, not just the primary one. Common miss: a utility function like `_clean_cell_value()` exists and is tested, but is only called from one of three file-reading functions.
+
+**1.7 Isolated function-level residual** — After the composition lenses, read remaining functions for local bugs (easy residual, not the main pass):
 
 - **Return paths:** None/null/undefined where a value is expected? Fall-through without explicit return?
 - **Conditionals:** Unreachable branches? Inputs matching no branch? Inverted logic?
@@ -14,25 +30,7 @@ Logic errors in production are the most expensive defects.
 - **Collections:** Access without containment check, mutation during iteration, empty-where-non-empty-assumed.
 - **Type coercion:** Implicit conversions that lose precision or change semantics.
 
-**1.2b Sequence-level audit** — Pass 1's function-level checklist catches single-function bugs, but the most expensive correctness bugs hide in the *ordering* between functions. For every pair of functions that touch the same file, shared state, or resource within a module:
-
-- **Write-then-read ordering:** If function A writes to a resource and function B reads it, verify B runs *after* A. If both can run in the same loop iteration, verify the ordering is enforced, not coincidental. Example: `_write_state()` before `_check_stop_signal()` on the same file — if write runs first, it can erase data that check needs to read.
-- **Read-modify-write atomicity:** If a function reads a file/dict, modifies it, and writes it back, check what happens if another function writes to the same target between the read and the write.
-- **Cleanup-on-all-paths:** If function A allocates a resource (temp file, lock, connection) and function B releases it, verify B runs on *every* exit path from A — including exceptions, early returns, and loop breaks.
-
-This is where Pass 1 historically misses bugs that Carmack (Pass 12) catches. The difference: Pass 1's function-level audit asks "is this function correct?" while sequence-level audit asks "do these functions compose correctly?" If the hardening profile's Pass Debt table shows Pass 1 missed ordering bugs, spend extra time here.
-
-**Pass 1 is a deep-read pass.** Like Carmack (Pass 12), its quality degrades with context size. In chunked mode, dispatch per module group using the same rigor as Carmack: audit manifest, CLEAN lists, untested-line priority. The hardening profile's hot spots (modules where Carmack/Chaos found correctness bugs on prior runs) should be read first and most carefully. If the profile says "Carmack found a correctness bug in `ingest.py` that Pass 1 missed," spend extra time on `ingest.py` this run.
-
-**1.2c API parity audit** — For every pair of public functions that serve the same data through different paths (e.g., a normalize-only orchestrator and a full-pipeline orchestrator), verify they accept the same metadata parameters and populate the same output fields. A parameter or field present on one path but missing from the other is a P1 finding. Common misses: lineage identifiers (`batch_id`), metadata stamps (`carrier`, `source_file`), and output fields (`row_number`, `fix_hint`) that one code path populates and the other silently leaves as defaults.
-
-**1.2d Field population audit** — For every output dataclass, verify that every field is actually populated by every code path that constructs it. The check: if a field has a default of `None`, `""`, or `[]`, trace every constructor call site and confirm the field is set. A field that defaults to empty and is never set by any code path is either intentionally optional (documented as such) or a latent bug. Pay special attention to fields populated by helper functions — verify the helper is actually *called*, not just *defined*. A utility function that exists but is never invoked on a code path is a common source of "I thought that was handled" bugs.
-
-**1.2e Classification completeness audit** — When code uses a set, enum, or mapping to classify items into categories (e.g., "which signals apply to which address types"), verify the classification is *complete*. For every item that *could* be in the set, confirm it either is or has an explicit reason not to be. The check: list all items of the type, then for each one, confirm it appears in the classification or document why it's excluded. Incomplete classification sets are invisible to function-level audits because the code that reads the set works correctly — the bug is in *what the set contains*, not in *how the set is used*.
-
-**1.2f I/O type coercion audit** — At every boundary where external data enters the system (file readers, API responses, deserialization), trace the type of each value from the source format (CSV string, Excel cell, JSON field) through to its first use. Verify that type cleaning/coercion functions are called on *every* ingestion path, not just the primary one. Common miss: a utility function like `_clean_cell_value()` exists and is tested, but is only called from one of three file-reading functions. The function works; it's just not called everywhere it should be.
-
-**1.3 Regression tests** — For every fix, write a test that would have caught the defect.
+**1.8 Regression tests** — For every fix, write a test that would have caught the defect. After every fix, grep other backends and dual paths for the same pattern (see Cross-Backend Awareness).
 
 ---
 
@@ -230,10 +228,11 @@ Documentation that disagrees with code is worse than no documentation.
 
 When fixing a defect in one backend implementation, check whether the same pattern exists in alternative backends. This is a mandatory step for Passes 1 and 12.
 
-**After every fix:**
+**After every fix (escalation loop):**
 1. Identify the pattern (e.g., missing rollback, LIMIT/OFFSET syntax, missing `_closed` guard)
-2. Grep for the same pattern in all other store implementations (`app/store/sqlite.py`, `app/store/fabric_sql.py`, `app/outcomes.py`, `app/run_state.py`)
+2. Grep for the same pattern in all other store implementations and dual paths
 3. If the same pattern exists elsewhere, fix all instances in the same commit
 4. If a conformance test exists, verify it passes for all backends
+5. If a mechanical pass should have caught this **combination**, write `pass_debt[]` with `why_missed` naming that combination
 
 This step was added after Run 22 found two P0s (`LIMIT/OFFSET` invalid T-SQL, missing `rollback()`) that existed only in `FabricSQLStore` because fixes applied to the SQLite stores were never cross-checked against the alternative backend.

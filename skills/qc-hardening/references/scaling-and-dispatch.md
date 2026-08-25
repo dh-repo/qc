@@ -12,7 +12,16 @@ Hardening must scale to large codebases without losing depth. Two modes:
 - Prior Carmack runs revealed coverage gaps (modules never questioned)
 - The project has more than ~8 production modules
 
-**Partial-rerun scoping:** The 5K LOC threshold is based on *total* codebase size, but that doesn't mean you must dispatch subagents for every module on every run. If the hardening profile shows >80% of modules were EXAMINED in prior runs and only N new/changed modules exist, run deep-read passes (1, 12) inline on just the new modules, and scope Pass 14 to the new/changed modules plus any existing hot spots. Only dispatch subagents for the full codebase if: (a) no prior profile exists, (b) the profile shows modules still marked NOT YET, or (c) the total new+changed LOC exceeds ~2K (enough to benefit from parallel review).
+**Partial-rerun scoping:** The 5K LOC threshold is based on *total* codebase size, but that doesn't mean you must dispatch subagents for every module on every run. If `.qc-profile.json` shows >80% of modules were EXAMINED in prior runs and only N new/changed modules exist, run deep-read passes (1, 12) inline on the new modules **plus mandatory neighbors** (below), and scope Pass 14 to that set plus existing hot spots. Only dispatch subagents for the full codebase if: (a) no prior profile exists, (b) the profile shows modules still marked NOT YET, or (c) the total new+changed+neighbor LOC exceeds ~2K.
+
+**Change creates new combinations.** After `git diff` against the last examined SHA:
+
+```
+python3 ../qc-core/scripts/partition.py --root . --reexam \
+  --since <last_examined_sha> --profile .qc-profile.json --json
+```
+
+`reexam` is changed files plus import-graph neighbors that already sit in `hot_spots[]` or `pass_debt[]`. Those neighbors are **mandatory composition re-examination** (Pass 1 sequence/dual-path and Carmack on that boundary), even if they did not change. Unrelated unchanged modules stay quick-check eligible.
 
 **Which passes benefit from subagents:**
 
@@ -25,18 +34,19 @@ Hardening must scale to large codebases without losing depth. Two modes:
 | 12 (Carmack) | **Always dispatch per module group** — deep reading degrades with context size |
 | 14 (Maintainability) | Usually coordinator synthesis after passes 12-13; dispatch targeted hot-spot rereads if maintainability risks span multiple module groups |
 
-**Module grouping heuristic:**
-1. List all production modules with LOC
-2. Group into chunks of 500-800 LOC each (target: one module group fits comfortably in a subagent's working context)
-3. Keep tightly-coupled modules together (e.g., `parser.py` + `normalizer.py` share the parse-then-normalize contract)
-4. Reference data modules (pure dicts/maps) can be skipped or grouped into a single "reference data" chunk
+**Module grouping:** import-graph primary, language boundary secondary, LOC tertiary. Do not split coupled files just to hit a LOC target.
+
+```
+python3 ../qc-core/scripts/partition.py --root . --json
+```
+
+Reference data modules (pure dicts/maps) can be skipped or grouped into a single "reference data" chunk. Full contract: qc-core `references/discovery-verify.md`.
 
 ## Discovery + Verify via dynamic workflow (preferred in chunked mode)
 
-In chunked mode, run the **Discovery + Verify** half of hardening — the parallel deep-read across
-module groups, the adversarial verification of each finding, and cross-module dedup — as a single
-**dynamic workflow** instead of hand-dispatching subagents per pass. The workflow ships with this
-skill at `workflows/discovery-verify.js` and returns a ranked, verified findings ledger.
+In chunked mode, run the **Discovery + Verify** half of hardening as the shared qc-core workflow
+(`../qc-core/workflows/discovery-verify.js`, `kind: "groups"`). Mechanical and human-confirmed
+hits skip dual-verify; everything else still requires both votes to say real before a fix.
 
 **Why a workflow here:** one rubric across N groups (no copy-paste drift), schema-enforced
 findings, a **2-vote adversarial refutation of every finding** (kills false positives, sharpens
@@ -49,16 +59,17 @@ verifies; it never edits code or commits. Remediation needs judgment a concurren
 have — severity calibration, the off-limits / in-flight-file boundary, golden-pin sensitivity, and
 commit isolation — plus sequential side effects that must not run concurrently.
 
-How to run it (after partitioning modules with the grouping heuristic above):
+How to run it (after `partition.py`):
 
 ```
 Workflow({
-  scriptPath: "<this skill's base dir>/workflows/discovery-verify.js",
+  scriptPath: "<qc-core>/workflows/discovery-verify.js",
   args: {
+    kind: "groups",
     repoPath: "<absolute repo root>",
     groups: [ { key, label, files: [...], untestedLines?, lenses? }, ... ],
     offLimits: [ "<uncommitted / in-flight files you must NOT modify>" ],
-    priorFindings: "<profile hot-spots + pass-debt + prior ledger, for multi-order analysis>",
+    priorState: "<profile hot-spots + pass-debt + prior ledger>",
     goldenNote: "<how pinned/golden values present in this repo>"
   }
 })
@@ -106,7 +117,7 @@ Coordinator:
 1. Assign it `F<pass>.X` like any other finding (e.g., `F12.6`)
 2. Classify severity using the same P0/P1/P2 scale — a race condition between two modules is not less severe because it spans a boundary
 3. Either fix it in the current pass, or explicitly defer it with severity and justification: `F12.6 (P1, deferred) — <what> — Deferred because: <reason>`. Deferred findings appear in REMAINING CONCERNS with their F-ID and severity, not as unnamed bullet points.
-4. Add deferred cross-module findings to the hardening profile Hot Spots section so the next run picks them up
+4. Add deferred cross-module findings to `.qc-profile.json` `hot_spots[]` so the next run picks them up
 
 Do NOT report cross-module issues as second-class "concerns" without IDs. If it has a concrete failure scenario, it's a finding. If it doesn't, it's not worth reporting.
 

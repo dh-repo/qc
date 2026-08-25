@@ -1,0 +1,21 @@
+{
+  "skill": "qc-hardening",
+  "must_find": [
+    {
+      "file_substring": "secret.py",
+      "severity": "P0",
+      "what_contains": ["sk-", "secret", "API_KEY", "hardcoded"]
+    },
+    {
+      "file_substring": "broken.py",
+      "severity": "P1",
+      "what_contains": ["strip", "None", "AttributeError", "normalize_name"]
+    },
+    {
+      "file_substring": "paths.py",
+      "severity": "P1",
+      "what_contains": ["batch_id", "process_full", "process_only"]
+    }
+  ],
+  "must_mark_clean": ["app/clean.py"]
+}

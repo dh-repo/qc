@@ -33,5 +33,5 @@ Invoke with: `/qc-coherence --scope=module` (replaces `/qc-structural`)
 
 | qc-structural artifact | qc-coherence artifact |
 |:---|:---|
-| `.structural-integrity.md` | Still used by `--scope=module` for accepted debt tracking |
+| `.structural-integrity.md` | Migrated into `.qc-profile.json` `deferred[]` (qc-core). Read the markdown only if the JSON does not exist yet. |
 | Output report (inline) | Folded into `.qc-coherence-report.md` under MODULE SCOPE section |
